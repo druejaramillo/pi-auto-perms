@@ -18,7 +18,7 @@ and probability calibration have **not** been verified.
 No active Pi configuration is changed by this repository. There is no
 runtime dependency on `@gotgenes/pi-permission-system`.
 
-## How it works
+## How it works (default review mode)
 
 1. Check tool, path, external-directory, and shell policies.
 2. Execute deterministic allowances; block deterministic denials.
@@ -36,6 +36,27 @@ working directory, effective rules, recent user messages, and a bounded
 previously blocked action. Extension-generated messages do not count as
 user approval. Reloaded policy, changed user context, changed arguments,
 or revoked project trust invalidate an in-flight approval.
+
+## YOLO mode
+
+YOLO is **off by default**. It bypasses every permission gate, including
+protected-path and shell denials, without contacting a reviewer.
+
+```text
+/auto-perms yolo on
+/auto-perms yolo off
+```
+
+Or start with `pi --auto-perms-yolo`, or set `"mode": "yolo"` in the global
+`auto-perms.json`. Project JSON cannot select this mode. Session commands
+never edit configuration; `off` overrides a global/CLI YOLO default for the
+current session. Policy reload preserves that override; a new session or
+extension reload returns to the configured/CLI default.
+
+YOLO also skips credential/evidence guards and chat-approval waiting. It
+cannot override other extensions, tool availability, OS permissions, or user
+instructions. Pi displays a YOLO warning/status, and decision entries record
+`source: "yolo"`. See [mode controls](docs/configuration.md#yolo-mode) for details.
 
 ## Reviewers
 
@@ -85,11 +106,12 @@ is supported.
 - Trusted project: `<cwd>/.pi/auto-perms.json`.
 - `/auto-perms`: show configuration in Pi's UI, not an API connection test.
 - `/auto-perms reload`: explicitly load a fresh policy snapshot.
+- `/auto-perms yolo on|off`: override the permission mode for this session.
 
 Project policy may override **any** global or built-in policy rule. Matching
 semantic rule IDs replace inherited rules; new IDs add rules. Permission
-maps merge in project patterns with last-match precedence. Reviewer selection
-and runtime limits are global-only configuration fields.
+maps merge in project patterns with last-match precedence. Permission mode,
+reviewer selection, and runtime limits are global-only configuration fields.
 
 Start with [the global example](examples/global-auto-perms.json) and
 [the project example](examples/project-auto-perms.json). See

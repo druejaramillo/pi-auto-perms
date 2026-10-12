@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { z } from "zod";
 
 const actionSchema = z.enum(["allow", "deny", "ask"]);
+const permissionModeSchema = z.enum(["review", "yolo"]);
 const surfaceSchema = z.union([actionSchema, z.record(z.string().min(1), actionSchema)]);
 const ruleSchema = z.strictObject({
   id: z.string().regex(/^[a-zA-Z][a-zA-Z0-9._-]{0,63}$/),
@@ -24,6 +25,7 @@ const policyShape = {
 const projectSchema = z.strictObject(policyShape);
 const globalSchema = z.strictObject({
   ...policyShape,
+  mode: permissionModeSchema.optional(),
   reviewer: z
     .strictObject({
       provider: z.enum(["typesafe", "cloudflare-workers-ai", "openai"]),
@@ -36,12 +38,15 @@ const globalSchema = z.strictObject({
   maxReviewChars: z.number().int().min(1024).max(128_000).optional(),
 });
 
+/** YOLO mode is an explicit operator bypass, never a trusted-project policy setting. */
+export type PermissionMode = z.infer<typeof permissionModeSchema>;
 /** Deterministic permission states; ask always means non-interactive model review. */
 export type PermissionAction = z.infer<typeof actionSchema>;
 /** A plain-language rule, replaced across scopes by its stable ID. */
 export type PermissionRule = z.infer<typeof ruleSchema>;
 /** Fully validated effective configuration, with no embedded credentials. */
 export interface PermissionConfig {
+  mode: PermissionMode;
   reviewer: { provider: "typesafe" | "cloudflare-workers-ai" | "openai"; model: string };
   minAllowProbability: number;
   reviewTimeoutMs: number;
@@ -52,6 +57,7 @@ export interface PermissionConfig {
 }
 
 const defaultConfig: PermissionConfig = {
+  mode: "review",
   reviewer: { provider: "typesafe", model: "jev-latest" },
   minAllowProbability: 0.95,
   reviewTimeoutMs: 5000,
@@ -196,6 +202,7 @@ export async function loadPermissionConfig(
   const global = await readPolicyFile(join(agentDir, "auto-perms.json"), globalSchema);
   const config: PermissionConfig = {
     ...mergePolicy(defaultConfig, global ?? {}),
+    mode: global?.mode ?? defaultConfig.mode,
     reviewer: global?.reviewer ?? defaultConfig.reviewer,
     minAllowProbability: global?.minAllowProbability ?? defaultConfig.minAllowProbability,
     reviewTimeoutMs: global?.reviewTimeoutMs ?? defaultConfig.reviewTimeoutMs,

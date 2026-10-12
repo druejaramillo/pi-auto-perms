@@ -10,6 +10,8 @@ Project policy is read from `<cwd>/.pi/auto-perms.json` only when
 Files are strict JSON. Missing files use inherited defaults. Invalid JSON,
 unknown top-level fields, invalid values, and duplicate rule IDs block tool
 calls rather than silently falling back to a more permissive configuration.
+An explicit session/CLI YOLO override can bypass even a broken policy; global
+`"mode": "yolo"` still requires valid applicable configuration files.
 Do not copy the old permission extension's entire configuration verbatim.
 
 Policy is snapshotted at session startup. Editing a file does not silently
@@ -25,6 +27,7 @@ All fields are optional; `version`, when present, must be `1`.
 
 | Setting | Default | Accepted values |
 | --- | --- | --- |
+| `mode` | `"review"` | `"review"` or `"yolo"`; global only |
 | `reviewer` | TypeSafe Jev | Explicit provider/model pair |
 | `minAllowProbability` | `0.95` | Greater than `0.5`, at most `1` |
 | `reviewTimeoutMs` | `5000` | Integer milliseconds, `1`–`120000` |
@@ -41,6 +44,38 @@ distribution and a non-conflicting reason category.
 There is no `failOpen`, dialog fallback, or alternate-provider fallback.
 Provider errors and timeouts block the action. A user saying “yes” does not
 repair missing credentials, an invalid policy, or an oversized review.
+These fail-closed rules apply in review mode; YOLO is an explicit operator
+bypass, not a fallback after a failed review.
+
+## YOLO mode
+
+Enable only when you intend to bypass **all** pi-auto-perms checks:
+
+- `/auto-perms yolo on`: enable YOLO for the current session.
+- `/auto-perms yolo off`: force review mode for the current session, even
+  when the global configuration or CLI flag enabled YOLO.
+- `pi --auto-perms-yolo`: start with a YOLO override; no reviewer credentials
+  are required. The extension must still be loaded.
+- Global `auto-perms.json`: `{ "mode": "yolo" }` selects a persistent default.
+  Use `{ "mode": "review" }`, or omit `mode`, for normal enforcement.
+
+Session commands do not write files. They take precedence over the global/CLI
+default and survive `/auto-perms reload`. A new session or extension reload
+clears the session command override and reapplies the global/CLI default.
+Mode changes clear pending-action/wait state and invalidate in-flight reviews,
+even when switched on and then back off. Already executing tools are not undone.
+
+YOLO skips tool/path/directory/shell denials, semantic review, inline-credential
+and evidence-size guards, and waiting for chat approval. No arguments are sent
+to a permission reviewer. Decision entries identify `source: "yolo"` without
+storing arguments. `/auto-perms` and Pi's status area identify the active mode;
+startup and enable commands warn when YOLO is active. No dialogs are opened.
+
+Project JSON cannot set `mode`. A trusted project containing this unsupported
+field is invalid; untrusted project files remain ignored. Ordinary prompt text
+does not toggle modes. Other extensions can still block actions or show dialogs,
+and normal tool validation, availability, cancellation, OS permissions, and
+user instructions still apply.
 
 ## Reviewer and credentials
 
@@ -175,8 +210,8 @@ Deterministic allowances run first and bypass these semantic rules.
 
 ## Project override authority
 
-Project files accept `version`, `permission`, and `rules`, not reviewer
-selection or runtime limits. Once the project is trusted:
+Project files accept `version`, `permission`, and `rules`, not permission mode,
+reviewer selection, or runtime limits. Once the project is trusted:
 
 1. A semantic rule with an inherited ID replaces that rule completely.
    Other inherited IDs remain; new IDs add rules.

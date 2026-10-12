@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "mode": "review",
   "reviewer": { "provider": "typesafe", "model": "jev-latest" },
   "minAllowProbability": 0.95,
   "reviewTimeoutMs": 5000,

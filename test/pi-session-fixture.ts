@@ -7,6 +7,7 @@ import {
   type ClassifierResult,
   createAssistantMessageEventStream,
   type JsonObject,
+  type TranscriptContext,
 } from "@earendil-works/pi-ai";
 import {
   createAgentSession,
@@ -24,6 +25,7 @@ export async function createPermissionSession(
     global?: unknown;
     project?: unknown;
     trusted?: boolean;
+    flags?: Record<string, boolean | string>;
     attemptsPerTurn?: number;
     followingCalls?: { name: string; arguments: JsonObject }[];
     extension?: ExtensionFactory;
@@ -57,6 +59,7 @@ export async function createPermissionSession(
   });
   const requests: ClassifierContext[] = [];
   const reviewers: string[] = [];
+  const chatRequests: TranscriptContext[] = [];
   runtime.classify = async (model, context) => {
     requests.push(context);
     reviewers.push(`${model.provider}/${model.id}`);
@@ -81,6 +84,7 @@ export async function createPermissionSession(
       },
     ],
     streamSimple: (model, context) => {
+      chatRequests.push(structuredClone(context));
       const lastUser = context.messages.findLastIndex((message) => message.role === "user");
       const results = context.messages
         .slice(lastUser + 1)
@@ -142,6 +146,9 @@ export async function createPermissionSession(
     tools: ["*"],
     thinkingLevel: "off",
   });
+  for (const [name, value] of Object.entries(options.flags ?? {})) {
+    session.extensionRunner.setFlagValue(name, value);
+  }
   await session.bindExtensions({});
 
   return {
@@ -152,6 +159,7 @@ export async function createPermissionSession(
     projectPath,
     requests,
     reviewers,
+    chatRequests,
     setProjectTrusted(trusted: boolean) {
       settingsManager.setProjectTrusted(trusted);
     },

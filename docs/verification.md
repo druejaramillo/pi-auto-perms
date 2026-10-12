@@ -33,6 +33,13 @@ Coverage includes:
   fallbacks, command chains, shell redirection, formatter preview versus
   apply, and nested writes through an allowed orchestrator.
 - Inline-credential submission blocked and oversized evidence not truncated.
+- YOLO global/session/CLI controls, restoration of deterministic and classifier
+  enforcement, project mode selection rejected/ignored, and stale approvals
+  invalidated after mode changes.
+- YOLO execution of denied shell commands and nested external writes without
+  reviewer calls, with argument-free YOLO decision metadata.
+- Session overrides preserved across policy reloads and cleared by extension
+  reloads; explicit session/CLI YOLO bypassing invalid policy.
 
 ## Installed Pi startup smoke
 
@@ -40,7 +47,9 @@ The extension was also loaded by the installed Pi `1.1.0` executable with
 an isolated empty home/agent directory, no inherited credentials, no other
 extensions or project resources, offline startup, and an in-memory session.
 The explicit `/auto-perms` command exited successfully with no stderr.
-This checks real extension-file loading and command registration, not
+The same isolated startup checks cover `/auto-perms yolo on`,
+`/auto-perms yolo off`, and `--auto-perms-yolo`; help output lists the flag.
+This checks real extension-file loading and command/flag registration, not
 classifier quality or tool execution in the CLI.
 
 Equivalent invocation, in a shell with an isolated credential-free environment:
