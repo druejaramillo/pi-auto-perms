@@ -5,7 +5,7 @@ import test from "node:test";
 import { createPermissionSession, permissionAnswer } from "../test/pi-session-fixture.ts";
 
 function resultText(result: { content: { type: string; text?: string }[] }): string {
-  return result.content.flatMap((item) => item.type === "text" ? [item.text] : []).join("\n");
+  return result.content.flatMap((item) => (item.type === "text" ? [item.text] : [])).join("\n");
 }
 
 test("a deterministic denial prevents a real Pi read without calling a reviewer", async () => {
@@ -25,13 +25,21 @@ test("a deterministic denial prevents a real Pi read without calling a reviewer"
 });
 
 test("a valid high-probability review lets Pi execute an otherwise asked write", async () => {
-  const fixture = await createPermissionSession({ classify: async (context) => permissionAnswer(context) });
+  const fixture = await createPermissionSession({
+    classify: async (context) => permissionAnswer(context),
+  });
   try {
-    const result = await fixture.run("write", { path: "approved.txt", content: "approved content" }, "Create approved.txt in this project.");
+    const result = await fixture.run(
+      "write",
+      { path: "approved.txt", content: "approved content" },
+      "Create approved.txt in this project.",
+    );
     assert.equal(result.isError, false);
     assert.equal(await readFile(join(fixture.cwd, "approved.txt"), "utf8"), "approved content");
     assert.equal(fixture.reviewers[0], "typesafe/jev-latest");
-    assert.deepEqual(fixture.requests[0]?.state.userMessages, ["Create approved.txt in this project."]);
+    assert.deepEqual(fixture.requests[0]?.state.userMessages, [
+      "Create approved.txt in this project.",
+    ]);
   } finally {
     await fixture.close();
   }

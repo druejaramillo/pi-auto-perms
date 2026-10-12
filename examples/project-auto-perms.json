@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "permission": {
+    "bash": { "rm -rf *": "ask" }
+  },
+  "rules": [
+    {
+      "id": "project-cleanup",
+      "effect": "allow",
+      "when": "The action only removes this project's regenerable build artifacts as part of the user's requested local development task."
+    }
+  ]
+}

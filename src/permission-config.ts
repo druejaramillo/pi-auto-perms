@@ -12,18 +12,24 @@ const ruleSchema = z.strictObject({
 const policyShape = {
   version: z.literal(1).optional(),
   permission: z.record(z.string().min(1), surfaceSchema).optional(),
-  rules: z.array(ruleSchema).max(100).refine(
-    (rules) => new Set(rules.map((rule) => rule.id)).size === rules.length,
-    "Rule IDs must be unique within each configuration file",
-  ).optional(),
+  rules: z
+    .array(ruleSchema)
+    .max(100)
+    .refine(
+      (rules) => new Set(rules.map((rule) => rule.id)).size === rules.length,
+      "Rule IDs must be unique within each configuration file",
+    )
+    .optional(),
 };
 const projectSchema = z.strictObject(policyShape);
 const globalSchema = z.strictObject({
   ...policyShape,
-  reviewer: z.strictObject({
-    provider: z.enum(["typesafe", "cloudflare-workers-ai", "openai"]),
-    model: z.string().trim().min(1),
-  }).optional(),
+  reviewer: z
+    .strictObject({
+      provider: z.enum(["typesafe", "cloudflare-workers-ai", "openai"]),
+      model: z.string().trim().min(1),
+    })
+    .optional(),
   minAllowProbability: z.number().gt(0.5).lte(1).optional(),
   reviewTimeoutMs: z.number().int().min(1).max(120_000).optional(),
   historyLimit: z.number().int().min(1).max(20).optional(),
@@ -53,44 +59,63 @@ const defaultConfig: PermissionConfig = {
   maxReviewChars: 32_000,
   permission: {
     "*": "ask",
-    read: "allow", grep: "allow", find: "allow", ls: "allow",
-    code_lsp: "allow", code_check: "allow",
+    read: "allow",
+    grep: "allow",
+    find: "allow",
+    ls: "allow",
+    code_lsp: "allow",
+    code_check: "allow",
     code_format: { "*": "ask", preview: "allow" },
     code_ast: { "*": "ask", preview: "allow" },
     path: {
       "*": "allow",
-      "*.env": "deny", "*.env.*": "deny", "*.env.example": "allow",
-      "*/.ssh/*": "deny", "*/auth.json": "deny", "*.key": "deny",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "*/.ssh/*": "deny",
+      "*/auth.json": "deny",
+      "*.key": "deny",
     },
     external_directory_read: {
       "*": "ask",
-      "~/.pi/agent/skills/*": "allow", "~/.agents/skills/*": "allow",
-      "~/.pi/agent/references/*": "allow", "~/.agents/references/*": "allow",
+      "~/.pi/agent/skills/*": "allow",
+      "~/.agents/skills/*": "allow",
+      "~/.pi/agent/references/*": "allow",
+      "~/.agents/references/*": "allow",
       "~/.pi/agent/AGENTS.md": "allow",
     },
     external_directory_write: "ask",
     bash: {
-      "*": "ask", pwd: "allow", "git status": "allow",
-      "git status --short": "allow", "git diff --stat": "allow",
+      "*": "ask",
+      pwd: "allow",
+      "git status": "allow",
+      "git status --short": "allow",
+      "git diff --stat": "allow",
     },
   },
   rules: [
     {
-      id: "routine-development", effect: "allow",
+      id: "routine-development",
+      effect: "allow",
       when: "The action is routine local development, inspection, testing, or editing needed for the user's task, or the user explicitly authorized this specific action within the current task's scope.",
     },
     {
-      id: "explicit-authorization", effect: "deny",
-      when: "The action publishes, pushes, deploys, spends money, makes irreversible changes, or accesses unrelated private data without explicit applicable authorization from the user.",
+      id: "explicit-authorization",
+      effect: "deny",
+      when: "The action publishes, pushes, deploys, spends money, makes irreversible changes, changes permission policy or credentials, or accesses unrelated private data without explicit applicable authorization from the user.",
     },
     {
-      id: "private-data", effect: "deny",
+      id: "private-data",
+      effect: "deny",
       when: "The action exposes private data or credentials to a recipient the user did not authorize, or disregards the user's most recent refusal of this action.",
     },
   ],
 };
 
-async function readPolicyFile<S extends z.ZodType>(path: string, schema: S): Promise<z.infer<S> | undefined> {
+async function readPolicyFile<S extends z.ZodType>(
+  path: string,
+  schema: S,
+): Promise<z.infer<S> | undefined> {
   let text: string;
   try {
     text = await readFile(path, "utf8");
@@ -99,36 +124,75 @@ async function readPolicyFile<S extends z.ZodType>(path: string, schema: S): Pro
     throw new Error(`pi-auto-perms: Cannot read configuration ${path}`);
   }
   let value: unknown;
-  try { value = JSON.parse(text); }
-  catch { throw new Error(`pi-auto-perms: Invalid JSON in ${path}`); }
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new Error(`pi-auto-perms: Invalid JSON in ${path}`);
+  }
   const parsed = schema.safeParse(value);
   if (!parsed.success) {
-    const issues = parsed.error.issues.map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`);
+    const issues = parsed.error.issues.map(
+      (issue) => `${issue.path.join(".") || "root"}: ${issue.message}`,
+    );
     throw new Error(`pi-auto-perms: Invalid configuration ${path}: ${issues.join("; ")}`);
   }
   return parsed.data;
 }
 
-function mergePolicy(base: PermissionConfig, scope: z.infer<typeof projectSchema>): PermissionConfig {
-  const permission = { ...base.permission };
-  for (const [surface, next] of Object.entries(scope.permission ?? {})) {
-    const prior = permission[surface];
-    permission[surface] = typeof prior === "object" && typeof next === "object"
-      ? Object.fromEntries([
+type PermissionSurfacePolicy = z.infer<typeof surfaceSchema>;
+
+function mergeSurfacePolicy(
+  prior: PermissionSurfacePolicy | undefined,
+  next: PermissionSurfacePolicy,
+): PermissionSurfacePolicy {
+  return typeof prior === "object" && typeof next === "object"
+    ? Object.fromEntries([
         ...Object.entries(prior).filter(([key]) => !Object.hasOwn(next, key)),
         ...Object.entries(next),
       ])
-      : next;
+    : next;
+}
+
+function normalizePathSurfaces(
+  policy: PermissionConfig["permission"],
+): PermissionConfig["permission"] {
+  const normalized = { ...policy };
+  for (const family of ["path", "external_directory"]) {
+    const bare = normalized[family];
+    if (bare === undefined) continue;
+    for (const direction of ["read", "write"]) {
+      const surface = `${family}_${direction}`;
+      const directional = normalized[surface];
+      normalized[surface] =
+        directional === undefined ? bare : mergeSurfacePolicy(bare, directional);
+    }
+    delete normalized[family];
+  }
+  return normalized;
+}
+
+function mergePolicy(
+  base: PermissionConfig,
+  scope: z.infer<typeof projectSchema>,
+): PermissionConfig {
+  const permission = normalizePathSurfaces(base.permission);
+  for (const [surface, next] of Object.entries(normalizePathSurfaces(scope.permission ?? {}))) {
+    permission[surface] = mergeSurfacePolicy(permission[surface], next);
   }
   const replaced = new Set(scope.rules?.map((rule) => rule.id));
   return {
-    ...base, permission,
+    ...base,
+    permission,
     rules: [...base.rules.filter((rule) => !replaced.has(rule.id)), ...(scope.rules ?? [])],
   };
 }
 
 /** Load global settings and trusted project overrides once per session/reload. */
-export async function loadPermissionConfig(agentDir: string, cwd: string, projectTrusted: boolean): Promise<PermissionConfig> {
+export async function loadPermissionConfig(
+  agentDir: string,
+  cwd: string,
+  projectTrusted: boolean,
+): Promise<PermissionConfig> {
   const global = await readPolicyFile(join(agentDir, "auto-perms.json"), globalSchema);
   const config: PermissionConfig = {
     ...mergePolicy(defaultConfig, global ?? {}),

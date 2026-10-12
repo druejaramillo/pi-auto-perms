@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "reviewer": { "provider": "typesafe", "model": "jev-latest" },
+  "minAllowProbability": 0.95,
+  "reviewTimeoutMs": 5000,
+  "historyLimit": 3,
+  "maxReviewChars": 32000,
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git status --short": "allow",
+      "rm -rf *": "deny"
+    }
+  },
+  "rules": [
+    {
+      "id": "no-production",
+      "effect": "deny",
+      "when": "The action modifies a production service."
+    }
+  ]
+}
