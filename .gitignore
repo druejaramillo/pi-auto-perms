@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Credentials must not enter version control.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+auth.json
+
+# Local runtime artifacts.
+logs/
+*.log
+.pi/sessions/
+.pi/auto-perms.local.json
+.DS_Store
