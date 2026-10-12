@@ -1,0 +1,43 @@
+{
+  "name": "pi-auto-perms",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Non-interactive Pi tool permissions with System One decision models",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "permissions",
+    "system-one"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/druejaramillo/pi-auto-perms.git"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "pi": {
+    "extensions": [
+      "./src/auto-perms-extension.ts"
+    ]
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "tsx --test src/*.test.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": ">=1.1.0",
+    "@earendil-works/pi-coding-agent": ">=1.1.0"
+  },
+  "dependencies": {
+    "shell-quote": "^1.12.0",
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^6.0.0"
+  }
+}

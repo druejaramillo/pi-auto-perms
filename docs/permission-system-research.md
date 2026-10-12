@@ -1,5 +1,10 @@
 # Permission-system research
 
+Historical investigation from before implementation. The user subsequently
+approved a standalone replacement, chat-based escalation instead of dialogs,
+and trusted project overrides of all global policy rules. Current implementation
+and setup instructions live in the [README](../README.md).
+
 ## Problem and baseline
 
 The user currently uses `@gotgenes/pi-permission-system` and wants fewer manual

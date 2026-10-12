@@ -5,8 +5,9 @@ System One decision models and plain-language policies.
 
 ## Status
 
-Initial research and repository setup only. There is no runnable extension yet.
-Safety defaults and the integration approach need approval before implementation.
+Standalone implementation in progress. Deterministic gates and classifier
+approval now run in real Pi SDK integration tests. There are no permission
+dialogs: uncertain reviews block and tell the agent to ask the user in chat.
 No active Pi configuration has been changed.
 
 ## Goal
