@@ -48,6 +48,27 @@ Coverage includes:
 - Session overrides preserved across policy reloads and cleared by extension
   reloads; explicit session/CLI YOLO bypassing invalid policy.
 
+## Herdr event-bus checks
+
+`src/permission-herdr.test.ts` binds real Pi SDK sessions in TUI, RPC, JSON,
+and print modes. Its 22 cases observe the existing `herdr:blocked` event
+contract without contacting a Herdr server. They cover:
+
+- Uncertain reviews staying blocked after agent settlement, retries, and
+  deterministic inspection; extension-generated messages do not resolve waits.
+- Genuine user input clearing the status, fresh refusals reacquiring it, and
+  successful one-use overrides resuming the agent without changing review rules.
+- Deterministic/reviewer denials and configuration/provider failures; permitted
+  alternatives resolving definite denials without approving the denied action.
+- Policy/mode/session resets and extension reloads releasing exactly one owned
+  block, without consuming another extension's blocking prompt.
+- Static argument-free labels, no events for ordinary allowances, and no TUI
+  status events from headless modes.
+
+The installed Herdr Pi integration v9 was inspected to confirm that it listens
+to this hook, counts active blockers, and gives them priority over idle status.
+Execution of that managed extension and its socket reporting was not tested.
+
 ## Installed Pi startup smoke
 
 The extension was also loaded by the installed Pi `1.1.0` executable with
@@ -81,6 +102,9 @@ Pi executable was invoked directly for the successful smoke check.
   probability calibration, real latency, token use, or billing behavior.
   Controlled fixtures prove approval-context delivery and override enforcement,
   not that live Jev reliably recognizes consent or improves its allow scores.
+- Herdr's managed extension execution, socket delivery, and sidebar/CLI status.
+  Herdr verification covers its inspected v9 hook and Pi event-bus behavior;
+  the optional managed-integration smoke test was skipped.
 - Real MCP servers and the built-in codemode runtime. Nested calls are
   exercised through the public `ctx.executeTool()` SDK path, not every host
   integration that might call tools.

@@ -45,6 +45,28 @@ changed user context, changed arguments, or revoked project trust invalidate
 an in-flight approval. Written consent still needs a qualifying reviewer verdict;
 a mistaken refusal can be overridden explicitly, without lowering the threshold.
 
+## Herdr status integration
+
+This extension uses the existing `herdr:blocked` event-bus hook in Herdr's
+managed Pi integration (confirmed in integration v9). It does not call the
+Herdr CLI/socket directly or modify Herdr's extension. Load both extensions;
+if needed, install Herdr's integration with `herdr integration install pi`.
+
+In Pi's TUI, a blocked tool reports **blocked**, with the label "Waiting for
+permission", rather than **done** when the agent finishes asking in chat.
+An uncertain review keeps that status through retries, extension-generated
+messages, and deterministic inspection. Genuine user input clears the status,
+not the permission checks; a fresh refusal marks it blocked again.
+
+A successful `/auto-perms approve`, policy reload, mode change, or session
+shutdown/reset also clears the wait. After a definite denial, an independently
+permitted alternative can clear it without requiring approval of the denied
+action. Events are balanced so cleanup cannot clear another extension's
+blocking prompt. Labels never include tool arguments or proposed file contents.
+
+No extra dependency or permission configuration is required. Without Herdr's
+listener, the events have no effect; RPC, JSON, and print modes do not emit them.
+
 ## One-use reviewer override
 
 Normally, answer the agent in chat. If review still refuses the action, use:
