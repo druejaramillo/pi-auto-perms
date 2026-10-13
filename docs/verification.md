@@ -39,6 +39,8 @@ Coverage includes:
 - Symlink aliases, native `@` paths, NFD/curly-quote/screenshot filename
   fallbacks, command chains, shell redirection, formatter preview versus
   apply, and nested writes through an allowed orchestrator.
+- Overlong ASCII, multibyte, and multiline shell arguments reaching review intact;
+  lexical and canonical symlink-parent denials preserved, with symlink loops failing closed.
 - Inline-credential submission blocked and oversized required evidence not truncated.
 - Inspected script source, completed script writes, and current assistant rationale
   reaching later script/compound-command reviews without becoming user consent.

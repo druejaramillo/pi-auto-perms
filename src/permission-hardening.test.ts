@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { Type } from "typebox";
@@ -90,6 +90,73 @@ test("a literal allowed shell command executes without a classifier request", as
     const result = await fixture.run("bash", { command: "pwd" });
     assert.equal(result.isError, false);
     assert.match(permissionResultText(result), /pi-auto-perms-test-/);
+    assert.equal(fixture.requests.length, 0);
+  } finally {
+    await fixture.close();
+  }
+});
+
+for (const [description, message] of [
+  ["ASCII", "x".repeat(256)],
+  ["multibyte", "é".repeat(128)],
+  ["multiline email body", "Synthetic portfolio description.\n".repeat(100)],
+] as const) {
+  test(`a long ${description} shell argument reaches review intact instead of failing as a filename`, async () => {
+    const fixture = await createPermissionSession({
+      classify: async (context) => permissionAnswer(context),
+    });
+    try {
+      const command = `printf '%s' '${message}'`;
+      const result = await fixture.run("bash", { command });
+      assert.equal(result.isError, false, permissionResultText(result));
+      assert.equal(permissionResultText(result), message);
+      assert.equal(fixture.requests.length, 1);
+      assert.deepEqual(fixture.requests[0]?.state.tool, { name: "bash", input: { command } });
+    } finally {
+      await fixture.close();
+    }
+  });
+}
+
+test("an overlong shell argument still obeys a lexical protected-path denial", async () => {
+  const fixture = await createPermissionSession();
+  try {
+    const result = await fixture.run("bash", { command: `printf '%s' '${"x".repeat(256)}.env'` });
+    assert.equal(result.isError, true);
+    assert.match(permissionResultText(result), /Denied by deterministic rule.*path_/);
+    assert.equal(fixture.requests.length, 0);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("an overlong shell path still obeys a canonical symlink-parent denial", async () => {
+  const fixture = await createPermissionSession({
+    global: { permission: { path: { "*/protected/*": "deny" } } },
+  });
+  try {
+    await mkdir(join(fixture.cwd, "protected"));
+    await symlink(join(fixture.cwd, "protected"), join(fixture.cwd, "alias"));
+    const result = await fixture.run("bash", {
+      command: `printf '%s' 'alias/${"x".repeat(256)}'`,
+    });
+    assert.equal(result.isError, true);
+    assert.match(permissionResultText(result), /Denied by deterministic rule.*protected/);
+    assert.equal(fixture.requests.length, 0);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("a symlink-loop error still fails closed before shell review", async () => {
+  const fixture = await createPermissionSession({
+    classify: async (context) => permissionAnswer(context),
+  });
+  try {
+    await symlink("loop", join(fixture.cwd, "loop"));
+    const result = await fixture.run("bash", { command: "printf '%s' loop/message.txt" });
+    assert.equal(result.isError, true);
+    assert.match(permissionResultText(result), /Configuration or deterministic evaluation failed/);
     assert.equal(fixture.requests.length, 0);
   } finally {
     await fixture.close();

@@ -53,7 +53,13 @@ async function canonicalPath(path: string): Promise<string> {
   try {
     return await realpath(path);
   } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") throw error;
+    if (
+      !(error instanceof Error) ||
+      !("code" in error) ||
+      !["ENOENT", "ENAMETOOLONG"].includes(String(error.code))
+    )
+      throw error;
+    // A long shell argument may be message text; still resolve ancestors for path-policy checks.
     const parent = dirname(path);
     if (parent === path) throw error;
     return resolve(await canonicalPath(parent), relative(parent, path));
