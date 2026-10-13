@@ -45,12 +45,33 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
   let pending: PendingPermissionAction | undefined;
   let sessionMode: PermissionMode | undefined;
   let manualApproval: PermissionManualApproval | undefined;
+  let herdrPermissionBlocked = false;
 
   pi.registerFlag("auto-perms-yolo", {
     description: "Bypass all pi-auto-perms checks without contacting a reviewer",
     type: "boolean",
     default: false,
   });
+
+  function setHerdrPermissionBlocked(ctx: ExtensionContext, active: boolean): void {
+    if ((active && ctx.mode !== "tui") || herdrPermissionBlocked === active) return;
+    herdrPermissionBlocked = active;
+    // Herdr counts blockers across extensions; emit exactly one matched pair per wait.
+    pi.events.emit(
+      "herdr:blocked",
+      active ? { active, label: "Waiting for permission" } : { active },
+    );
+  }
+
+  function blockToolPermission(ctx: ExtensionContext, reason: string) {
+    setHerdrPermissionBlocked(ctx, true);
+    return { block: true, reason };
+  }
+
+  function clearPermissionBlockAfterAllowance(ctx: ExtensionContext): void {
+    // Deterministic inspection is available during uncertainty, but cannot resolve that wait.
+    if (waitingAtRevision !== userRevision) setHerdrPermissionBlocked(ctx, false);
+  }
 
   function updatePermissionModeStatus(ctx: ExtensionContext, mode: PermissionMode | undefined) {
     ctx.ui.setStatus(
@@ -63,7 +84,8 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
     );
   }
 
-  function recordYoloAllowance(event: ToolCallEvent): void {
+  function recordYoloAllowance(event: ToolCallEvent, ctx: ExtensionContext): void {
+    setHerdrPermissionBlocked(ctx, false);
     pi.appendEntry("auto-perms-decision", {
       tool: event.toolName,
       toolCallId: event.toolCallId,
@@ -82,6 +104,7 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
     waitingAtRevision = undefined;
     pending = undefined;
     manualApproval = undefined;
+    setHerdrPermissionBlocked(ctx, false);
     return configSnapshot;
   }
 
@@ -103,8 +126,12 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
     updatePermissionModeStatus(ctx, mode);
     if (mode === "yolo") ctx.ui.notify(yoloModeWarning, "warning");
   });
+  pi.on("session_shutdown", (_event, ctx) => {
+    setHerdrPermissionBlocked(ctx, false);
+  });
   pi.on("input", (event, ctx) => {
     if (event.source !== "extension") {
+      setHerdrPermissionBlocked(ctx, false);
       manualApproval = undefined;
       const previousAssistant = ctx.sessionManager
         .getBranch()
@@ -170,6 +197,7 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
         manualApproval = { ...target, state: "approved", revision: userRevision };
         waitingAtRevision = undefined;
         pending = undefined;
+        setHerdrPermissionBlocked(ctx, false);
         ctx.ui.notify(
           `pi-auto-perms: Reviewer override granted once for ${target.tool}, with identical arguments. Deterministic denials still apply. Retrying through the agent.`,
           "warning",
@@ -187,6 +215,7 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
         waitingAtRevision = undefined;
         pending = undefined;
         manualApproval = undefined;
+        setHerdrPermissionBlocked(ctx, false);
         updatePermissionModeStatus(ctx, sessionMode);
         ctx.ui.notify(
           sessionMode === "yolo"
@@ -227,7 +256,7 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
   });
   pi.on("tool_call", async (event, ctx) => {
     try {
-      if (sessionMode === "yolo" && !ctx.signal?.aborted) return recordYoloAllowance(event);
+      if (sessionMode === "yolo" && !ctx.signal?.aborted) return recordYoloAllowance(event, ctx);
       const snapshot = currentConfigSnapshot(ctx);
       const revision = userRevision;
       const inputSnapshot = JSON.stringify(event.input);
@@ -239,20 +268,17 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
         ctx.cwd !== snapshot.cwd ||
         ctx.isProjectTrusted() !== snapshot.trusted ||
         JSON.stringify(event.input) !== inputSnapshot;
-      const staleBlock = {
-        block: true,
-        reason:
-          "pi-auto-perms: Policy, permission mode, user context, or tool arguments changed during evaluation. No stale permission was applied. Ask the user for clarification before retrying.",
-      };
-      if (stale()) return staleBlock;
-      if ((sessionMode ?? policy.mode) === "yolo") return recordYoloAllowance(event);
+      const staleReason =
+        "pi-auto-perms: Policy, permission mode, user context, or tool arguments changed during evaluation. No stale permission was applied. Ask the user for clarification before retrying.";
+      if (stale()) return blockToolPermission(ctx, staleReason);
+      if ((sessionMode ?? policy.mode) === "yolo") return recordYoloAllowance(event, ctx);
       const deterministic = await decideDeterministicPermission(
         policy,
         event.toolName,
         event.input,
         ctx.cwd,
       );
-      if (stale()) return staleBlock;
+      if (stale()) return blockToolPermission(ctx, staleReason);
       if (deterministic.action !== "ask") {
         pi.appendEntry("auto-perms-decision", {
           tool: event.toolName,
@@ -261,13 +287,16 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
           source: "deterministic",
           rule: deterministic.rule,
         });
-        if (deterministic.action === "allow") return;
+        if (deterministic.action === "allow") {
+          clearPermissionBlockAfterAllowance(ctx);
+          return;
+        }
         manualApproval = undefined;
         pending = undefined;
-        return {
-          block: true,
-          reason: `pi-auto-perms: Denied by deterministic rule '${deterministic.rule}'. Do not bypass this block. Chat approval cannot override this rule; ask the user to change the global/project policy if appropriate.`,
-        };
+        return blockToolPermission(
+          ctx,
+          `pi-auto-perms: Denied by deterministic rule '${deterministic.rule}'. Do not bypass this block. Chat approval cannot override this rule; ask the user to change the global/project policy if appropriate.`,
+        );
       }
       if (manualApproval?.state === "approved") {
         const approval = manualApproval;
@@ -287,15 +316,13 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
             action: "allow",
             source: "manual-approval",
           });
+          clearPermissionBlockAfterAllowance(ctx);
           return;
         }
       }
-      const waitingBlock = {
-        block: true,
-        reason:
-          "pi-auto-perms: Awaiting a new user reply after a blocked action. Do not retry or switch tools to bypass it. Ask the user explicitly in chat and wait for their answer.",
-      };
-      if (waitingAtRevision === revision) return waitingBlock;
+      const waitingReason =
+        "pi-auto-perms: Awaiting a new user reply after a blocked action. Do not retry or switch tools to bypass it. Ask the user explicitly in chat and wait for their answer.";
+      if (waitingAtRevision === revision) return blockToolPermission(ctx, waitingReason);
       const description = pi
         .getAllTools()
         .find((tool) => tool.name === event.toolName)?.description;
@@ -309,9 +336,9 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
         description,
         assistantMessageBeforeLatestUser,
       );
-      if (stale()) return staleBlock;
+      if (stale()) return blockToolPermission(ctx, staleReason);
       // A sibling call may have requested user clarification while this one was reviewing.
-      if (waitingAtRevision === revision) return waitingBlock;
+      if (waitingAtRevision === revision) return blockToolPermission(ctx, waitingReason);
       pi.appendEntry("auto-perms-decision", {
         tool: event.toolName,
         toolCallId: event.toolCallId,
@@ -321,6 +348,7 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
       });
       if (review.action === "allow") {
         pending = undefined;
+        clearPermissionBlockAfterAllowance(ctx);
         return;
       }
       manualApproval = {
@@ -337,15 +365,14 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
         !containsInlinePermissionCredentials(pendingInput)
           ? { tool: event.toolName, input: pendingInput }
           : undefined;
-      return { block: true, reason: review.reason };
+      return blockToolPermission(ctx, review.reason);
     } catch {
       manualApproval = undefined;
       pending = undefined;
-      return {
-        block: true,
-        reason:
-          "pi-auto-perms: Configuration or deterministic evaluation failed; no tool was executed. Ask the user to fix the policy and run /auto-perms reload. Do not bypass the block.",
-      };
+      return blockToolPermission(
+        ctx,
+        "pi-auto-perms: Configuration or deterministic evaluation failed; no tool was executed. Ask the user to fix the policy and run /auto-perms reload. Do not bypass the block.",
+      );
     }
   });
 }

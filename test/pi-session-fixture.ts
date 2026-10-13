@@ -26,6 +26,7 @@ export async function createPermissionSession(
     project?: unknown;
     trusted?: boolean;
     flags?: Record<string, boolean | string>;
+    mode?: "tui" | "rpc" | "json" | "print";
     attemptsPerTurn?: number;
     assistantReply?: string;
     followingCalls?: { name: string; arguments: JsonObject }[];
@@ -150,7 +151,7 @@ export async function createPermissionSession(
   for (const [name, value] of Object.entries(options.flags ?? {})) {
     session.extensionRunner.setFlagValue(name, value);
   }
-  await session.bindExtensions({});
+  await session.bindExtensions({ mode: options.mode });
 
   return {
     session,
