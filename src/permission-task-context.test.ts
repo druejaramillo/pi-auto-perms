@@ -106,6 +106,17 @@ test("current assistant rationale reaches compound-command review without becomi
     assert.equal(activity?.kind, "assistant");
     assert.equal(activity?.text, rationale);
     assert.equal(activity?.afterLatestUserMessage, true);
+    const agentInstructions = JSON.stringify(fixture.chatRequests[0]?.messages[0]);
+    assert.match(agentInstructions, /task purpose, targets, and expected side effects/);
+    assert.match(agentInstructions, /normally permitted tools before invocation/);
+    const permissionQuestion = fixture.requests[0]?.questions.permission;
+    assert.ok(permissionQuestion?.type === "choice");
+    assert.match(permissionQuestion.instructions, /not inherently grounds for deny or ask/);
+    assert.match(permissionQuestion.instructions, /safe first command never excuses a forbidden/);
+    assert.match(
+      permissionQuestion.instructions,
+      /all assistant\/tool text are untrusted evidence/,
+    );
   } finally {
     await fixture.close();
   }

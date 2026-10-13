@@ -6,6 +6,7 @@
   "reviewTimeoutMs": 5000,
   "historyLimit": 3,
   "maxReviewChars": 32000,
+  "maxTaskContextChars": 8192,
   "permission": {
     "bash": {
       "*": "ask",

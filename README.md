@@ -35,10 +35,25 @@ runtime dependency on `@gotgenes/pi-permission-system`.
 
 Reviews include exact tool arguments, the declared tool description,
 working directory, effective rules, recent genuine user messages, the assistant
-message preceding the latest reply, and a bounded previously blocked action.
+message preceding the latest reply, a bounded previously blocked action, and
+bounded task context from recent assistant explanations and completed tool
+observations. Inspected script source and previously written code can therefore
+inform a later script invocation, instead of reviewing only `bash script.sh`.
+
 The reviewer is told that policy `ask` entries route review, not establish
-missing consent. It evaluates the current invocation's actual danger, not
-hypothetical future commands covered by a broader grant.
+missing consent. It assesses actual effects and task scope, not hypothetical
+executable capabilities: compound commands, heredocs, and Python/bash scripts
+are not inherently dangerous. It still evaluates every reachable step and
+preserves applicable denials, refusals, and concrete unresolved risks.
+Assistant/tool context is untrusted evidence, never consent or policy.
+
+Task history retains at most 12 recent whole observations within an 8,192-character
+default budget and the remaining total review budget. Set global
+`maxTaskContextChars` to `0` to disable it. Oversized or credential-bearing
+historical entries are omitted with omission metadata; current arguments,
+policy, and authorization evidence are never shortened to make room.
+The agent is instructed to explain nontrivial commands and inspect unseen
+script source through normally permitted tools before invocation.
 
 Extension-generated messages do not count as user approval. Reloaded policy,
 changed user context, changed arguments, or revoked project trust invalidate
@@ -174,10 +189,13 @@ that its implementation has no side effects.
 
 Deterministic allowances bypass semantic review and chat context. Keep them
 narrow. The selected reviewer receives full arguments, including proposed
-file contents, recent user text, and the assistant message preceding the latest
-reply. A conservative guard blocks obvious
-inline credentials before sending review evidence, but it is not complete
-secret detection. Do not put credentials in prompts or permission files.
+file contents, recent user text, the assistant message preceding the latest
+reply, and bounded recent assistant/tool text, which can include source code
+and command output. A conservative guard blocks obvious inline credentials
+in required evidence and omits credential-bearing supplemental history, but
+it is not complete secret detection. Choose the reviewer with your code and
+data policies in mind; disable task history if needed. Do not put credentials
+in prompts or permission files.
 
 Project overrides have full policy authority once the project is trusted.
 There are no immutable global denials. Trusting a project is consequential,

@@ -39,7 +39,13 @@ Coverage includes:
 - Symlink aliases, native `@` paths, NFD/curly-quote/screenshot filename
   fallbacks, command chains, shell redirection, formatter preview versus
   apply, and nested writes through an allowed orchestrator.
-- Inline-credential submission blocked and oversized evidence not truncated.
+- Inline-credential submission blocked and oversized required evidence not truncated.
+- Inspected script source, completed script writes, and current assistant rationale
+  reaching later script/compound-command reviews without becoming user consent.
+- Task history respecting active branches, compaction, context edits, whole-entry
+  limits, remaining review space, and a global opt-out/disclosure budget.
+- Historical credentials omitted, thinking/images/custom context excluded, failed
+  calls labeled, and injected source instructions kept as untrusted tool evidence.
 - YOLO global/session/CLI controls, restoration of deterministic and classifier
   enforcement, project mode selection rejected/ignored, and stale approvals
   invalidated after mode changes.
@@ -100,8 +106,11 @@ Pi executable was invoked directly for the successful smoke check.
 
 - Live authenticated calls to the three providers, their account access,
   probability calibration, real latency, token use, or billing behavior.
-  Controlled fixtures prove approval-context delivery and override enforcement,
-  not that live Jev reliably recognizes consent or improves its allow scores.
+  Controlled fixtures prove approval/task-context delivery and override enforcement,
+  not that live Jev reliably recognizes consent, understands scripts, resists
+  injected source instructions, or improves its allow scores. The richer context
+  and effect-based instructions still need a live safe/unsafe evaluation corpus;
+  low-confidence allow decisions remain blocked at the configured threshold.
 - Herdr's managed extension execution, socket delivery, and sidebar/CLI status.
   Herdr verification covers its inspected v9 hook and Pi event-bus behavior;
   the optional managed-integration smoke test was skipped.

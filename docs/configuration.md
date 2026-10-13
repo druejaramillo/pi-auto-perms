@@ -33,6 +33,7 @@ All fields are optional; `version`, when present, must be `1`.
 | `reviewTimeoutMs` | `5000` | Integer milliseconds, `1`–`120000` |
 | `historyLimit` | `3` | Integer recent user messages, `1`–`20` |
 | `maxReviewChars` | `32000` | Serialized review characters, `1024`–`128000` |
+| `maxTaskContextChars` | `8192` | Supplemental history characters, `0`–`64000`; `0` disables history |
 | `permission` | Built-in deterministic policy | Surface policies below |
 | `rules` | Built-in semantic rules | At most 100 unique rules per file |
 
@@ -253,6 +254,41 @@ uncertainty about harm, recipients, or effects remain relevant. The threshold
 is unchanged, and the extension never invents an allow score from written
 consent. Live reviewer recognition of these instructions is not yet verified.
 
+For compound commands and scripts, review is effect-based rather than a syntax
+blacklist. The reviewer is instructed to assess every reachable command,
+redirection, substitution, inline program, target, and recipient. Multiple
+commands, heredocs, loops, and Python/bash wrappers alone are not reasons to
+block. A task request normally covers its bounded routine development steps;
+it does not remove explicit-consent requirements for consequential actions or
+applicable policy denials. Dangerous strings used as test data are distinct
+from commands that will actually execute.
+
+`taskContext` supplies up to 12 recent whole assistant explanations and completed
+tool observations, newest preferred and retained in chronological order. Tool
+observations include the original call arguments when available, textual output,
+error status, and whether non-text output was excluded. This lets previously
+inspected or written script contents inform a later invocation. Failed calls
+are not presented as successful changes; pending calls are not presented as
+completed observations. Evidence can be stale, partial, or unrelated, and is
+never user consent or a policy instruction.
+
+History comes from Pi's active session projection, honoring branch selection,
+compaction, and context edits. Thinking, images, tool-result details, system
+messages, extension/custom messages, and summaries are excluded. Genuine user
+instructions remain in the separate authorization evidence. The extension does
+not automatically read script files or execute code to gather review evidence.
+The agent is instructed to explain a nontrivial command's purpose, targets, and
+side effects, and inspect otherwise unseen source through normally permitted
+tools before invocation. This does not authorize bypassing an existing block.
+
+`maxTaskContextChars` is global-only. The serialized history must fit both this
+budget and the space remaining under `maxReviewChars` after all required action,
+policy, and authorization evidence. Set it to `0` to opt out. Entries are kept
+whole or omitted, never shortened into seemingly complete scripts. Omitted
+entries are counted; size/credential omission markers are included when they
+fit. Missing history is not itself proof of danger or safety; a concrete,
+consequential uncertainty still requires clarification.
+
 Only one bounded pending action is retained. Credential-bearing or large
 arguments are not kept as pending evidence. If a short reply is ambiguous,
 the agent should ask for a specific restatement of the authorization.
@@ -263,13 +299,16 @@ allowed alternatives; it does not authorize switching tools to perform the
 same forbidden action. Every new reviewed action gets a fresh decision.
 Reviewer approvals are not cached across calls or sessions.
 
-The complete serialized review must fit `maxReviewChars`; evidence is never
-truncated to obtain approval. Obvious inline credentials block submission
-rather than being silently redacted from the action. Provider exceptions
+The complete serialized review must fit `maxReviewChars`; required evidence is
+never truncated to obtain approval. Obvious inline credentials in required
+evidence block submission rather than being silently redacted from the action.
+Supplemental historical entries with possible credentials are omitted as above.
+The guard is conservative, not complete secret detection. Provider exceptions
 are reported generically instead of echoing potentially sensitive details.
-The selected reviewer sees full tool arguments, including proposed file
-contents and the assistant's preceding message, so choose it with your code
-and data policies in mind.
+The selected reviewer sees full tool arguments, proposed file contents, user
+messages, the assistant's preceding message, and bounded recent assistant/tool
+text, including inspected code and command output. Choose it and the history
+budget with your code and data policies in mind.
 
 ## One-use reviewer override
 
