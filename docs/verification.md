@@ -24,6 +24,13 @@ Coverage includes:
 - Explicit provider/model selection for Jev, Clef, Clef Flash, and Decisions.
 - Uncertain actions waiting for a genuine user reply, extension-generated
   messages excluded, bounded history, and the latest refusal reaching review.
+- Written approval linked to the assistant's preceding question and exact
+  retry, without fabricating a high-probability verdict when review stays unsure.
+- One-use `/auto-perms approve` overrides of reviewer denials, agent resumption,
+  identical/reordered versus changed arguments, and repeated-call consumption.
+- Manual override invalidation on reload, trust changes, and new user input;
+  deterministic denials preserved; credential-bearing arguments hashed without
+  provider submission or argument-bearing decision metadata.
 - Clear denials allowing independently permitted alternatives.
 - Trusted overrides of tool, protected-path, and directory-boundary denials;
   additive/replaced semantic rules; untrusted policy ignored; revoked trust.
@@ -50,7 +57,8 @@ The explicit `/auto-perms` command exited successfully with no stderr.
 The same isolated startup checks cover `/auto-perms yolo on`,
 `/auto-perms yolo off`, and `--auto-perms-yolo`; help output lists the flag.
 This checks real extension-file loading and command/flag registration, not
-classifier quality or tool execution in the CLI.
+classifier quality or tool execution in the CLI. `/auto-perms approve` is also
+checked with no pending invocation: it loads and returns without a model call.
 
 Equivalent invocation, in a shell with an isolated credential-free environment:
 
@@ -71,6 +79,8 @@ Pi executable was invoked directly for the successful smoke check.
 
 - Live authenticated calls to the three providers, their account access,
   probability calibration, real latency, token use, or billing behavior.
+  Controlled fixtures prove approval-context delivery and override enforcement,
+  not that live Jev reliably recognizes consent or improves its allow scores.
 - Real MCP servers and the built-in codemode runtime. Nested calls are
   exercised through the public `ctx.executeTool()` SDK path, not every host
   integration that might call tools.

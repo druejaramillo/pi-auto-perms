@@ -17,8 +17,8 @@ Do not copy the old permission extension's entire configuration verbatim.
 Policy is snapshotted at session startup. Editing a file does not silently
 change running permissions: use `/auto-perms reload`. Changes to the working
 directory or native project-trust state also refresh the applicable snapshot.
-A reload clears pending-action evidence and the wait for a chat reply;
-it invalidates any review using the previous snapshot.
+A reload clears pending-action evidence, manual override state, and the wait
+for a chat reply; it invalidates any review using the previous snapshot.
 
 ## Global settings
 
@@ -62,7 +62,7 @@ Enable only when you intend to bypass **all** pi-auto-perms checks:
 Session commands do not write files. They take precedence over the global/CLI
 default and survive `/auto-perms reload`. A new session or extension reload
 clears the session command override and reapplies the global/CLI default.
-Mode changes clear pending-action/wait state and invalidate in-flight reviews,
+Mode changes clear pending-action/wait and manual override state and invalidate in-flight reviews,
 even when switched on and then back off. Already executing tools are not undone.
 
 YOLO skips tool/path/directory/shell denials, semantic review, inline-credential
@@ -141,7 +141,8 @@ A surface can be an action or an ordered glob map:
 
 Actions are `allow`, `deny`, and `ask`. `ask` invokes the decision model,
 never a permission dialog. A deterministic `deny` cannot be overridden by
-chat approval: an operator must change the applicable global/project policy.
+chat approval or `/auto-perms approve`: an operator must change the applicable
+global/project policy.
 
 - `*` is the fallback tool policy. Exact tool names select their own surface.
 - `read`, `write`, `edit`, `grep`, `find`, and `ls` maps match file paths.
@@ -231,10 +232,26 @@ that relaxes a global shell denial and adds a scoped semantic allowance.
 
 ## Conversation and failure handling
 
-The reviewer receives recent genuine interactive/RPC user messages in order,
-not the full transcript or extension-generated user messages. The most recent
-refusal matters. A previous blocked action supplies context for a short
-reply such as “yes”; it does not itself grant permission.
+Written approval is the usual flow. The reviewer receives recent genuine
+interactive/RPC user messages in order, the assistant message preceding the
+latest reply, and an indicator of whether the invocation exactly matches the
+previous blocked action. It does not receive the full transcript or treat
+extension-generated user messages as consent. The most recent refusal wins.
+
+A short “yes” to the agent's question authorizes that question's action and
+scope. A reply to a different question does not authorize an older block.
+An explicit encompassing grant, such as “you can use all Git commands,” can
+supply consent for `git --version`; the reviewer evaluates that command's
+actual effects rather than hypothetical dangerous Git operations. Narrow
+approval is not expanded into a broad or permanent grant.
+
+Deterministic `ask` entries mean “send to review,” not “consent is missing.”
+The reviewer is instructed to allow a clearly authorized routine invocation
+with no applicable denial or unresolved serious risk. Approval can satisfy a
+rule's authorization exception; unconditional semantic denials and genuine
+uncertainty about harm, recipients, or effects remain relevant. The threshold
+is unchanged, and the extension never invents an allow score from written
+consent. Live reviewer recognition of these instructions is not yet verified.
 
 Only one bounded pending action is retained. Credential-bearing or large
 arguments are not kept as pending evidence. If a short reply is ambiguous,
@@ -244,11 +261,47 @@ An uncertain review pauses further reviewed calls until a new genuine user
 message or operator reload. A clear denial still permits independently
 allowed alternatives; it does not authorize switching tools to perform the
 same forbidden action. Every new reviewed action gets a fresh decision.
-Approvals are not cached across calls or sessions.
+Reviewer approvals are not cached across calls or sessions.
 
 The complete serialized review must fit `maxReviewChars`; evidence is never
 truncated to obtain approval. Obvious inline credentials block submission
 rather than being silently redacted from the action. Provider exceptions
 are reported generically instead of echoing potentially sensitive details.
 The selected reviewer sees full tool arguments, including proposed file
-contents, so choose it with your code and data policies in mind.
+contents and the assistant's preceding message, so choose it with your code
+and data policies in mind.
+
+## One-use reviewer override
+
+If the reviewer still refuses after normal chat approval, the user can enter:
+
+```text
+/auto-perms approve
+```
+
+This is an explicit operator override, not another classifier request:
+
+- It targets the last reviewer-blocked invocation in the current conversation
+  branch. The agent must be idle; the command resumes it with instructions to
+  retry only that invocation. It never invokes the tool directly.
+- It deliberately skips semantic review, including semantic denials,
+  uncertainty, provider/timeout failures, and credential/evidence guards.
+  It cannot repair invalid configuration or bypass tool/path/directory/shell
+  denials. Change policy explicitly for a deterministic denial.
+- The tool and complete arguments must match. Object-key ordering is ignored;
+  changed values, array order, path spelling, or tool name are not. A bounded
+  fingerprint is stored, not another copy of potentially sensitive arguments.
+- The next review-routed invocation consumes the override. A mismatch revokes
+  it and goes through normal review. Deterministic inspection can still run
+  without consuming it; the grant expires when the retry turn settles unused.
+- New genuine user input, policy reloads, cwd/trust changes, mode changes,
+  session/extension reloads, or leaving the target's branch invalidate it.
+  A newer deterministic denial also clears an older override target.
+- Decision metadata records `source: "manual-approval"` without arguments.
+  Other extensions, tool validation, cancellation, OS permissions, and user
+  instructions still apply.
+
+The extension-generated retry message is not treated as chat consent for any
+other action. The agent should not initiate this command or turn it into the
+normal permission flow. No files, authentication, threshold, or permanent
+policy settings are changed.

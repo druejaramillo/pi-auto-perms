@@ -27,6 +27,7 @@ export async function createPermissionSession(
     trusted?: boolean;
     flags?: Record<string, boolean | string>;
     attemptsPerTurn?: number;
+    assistantReply?: string;
     followingCalls?: { name: string; arguments: JsonObject }[];
     extension?: ExtensionFactory;
     classify?: (context: ClassifierContext) => Promise<ClassifierResult>;
@@ -93,7 +94,7 @@ export async function createPermissionSession(
       const message: AssistantMessage = {
         role: "assistant",
         content: hasResult
-          ? [{ type: "text", text: "Done" }]
+          ? [{ type: "text", text: options.assistantReply ?? "Done" }]
           : [
               {
                 type: "toolCall",
@@ -160,6 +161,9 @@ export async function createPermissionSession(
     requests,
     reviewers,
     chatRequests,
+    setNextAction(name: string, args: JsonObject) {
+      action = { name, arguments: args };
+    },
     setProjectTrusted(trusted: boolean) {
       settingsManager.setProjectTrusted(trusted);
     },

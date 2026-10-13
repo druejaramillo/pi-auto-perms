@@ -5,8 +5,10 @@ with System One decision-model reviews.
 
 Deterministic rules still allow or deny immediately. `ask` means **review**,
 not a dialog. An uncertain or failed review blocks execution and tells the
-agent to ask the user in chat. A later genuine user reply informs a fresh
-review; it is not a cached permission grant.
+agent to ask the user in chat. Written approval is the normal flow: the reviewer
+considers the reply alongside the agent's question and the blocked invocation.
+Approval supplies consent within its stated scope, not a blanket safety bypass.
+`/auto-perms approve` is an explicit, one-use reviewer override when needed.
 
 ## Status
 
@@ -32,10 +34,32 @@ runtime dependency on `@gotgenes/pi-permission-system`.
    permission dialog. Deterministic inspection remains available.
 
 Reviews include exact tool arguments, the declared tool description,
-working directory, effective rules, recent user messages, and a bounded
-previously blocked action. Extension-generated messages do not count as
-user approval. Reloaded policy, changed user context, changed arguments,
-or revoked project trust invalidate an in-flight approval.
+working directory, effective rules, recent genuine user messages, the assistant
+message preceding the latest reply, and a bounded previously blocked action.
+The reviewer is told that policy `ask` entries route review, not establish
+missing consent. It evaluates the current invocation's actual danger, not
+hypothetical future commands covered by a broader grant.
+
+Extension-generated messages do not count as user approval. Reloaded policy,
+changed user context, changed arguments, or revoked project trust invalidate
+an in-flight approval. Written consent still needs a qualifying reviewer verdict;
+a mistaken refusal can be overridden explicitly, without lowering the threshold.
+
+## One-use reviewer override
+
+Normally, answer the agent in chat. If review still refuses the action, use:
+
+```text
+/auto-perms approve
+```
+
+This deliberately bypasses the reviewer, its semantic denials, and review
+failures for **only the last reviewer-blocked tool invocation**, with identical
+arguments. Pi resumes the agent to retry it; the command does not execute the
+tool directly. The override is consumed once, does not authorize changed
+arguments or other tools, and never bypasses deterministic denials or other
+extensions. New user input, policy/context changes, and an unused completed
+retry turn clear it. See [override details](docs/configuration.md#one-use-reviewer-override).
 
 ## YOLO mode
 
@@ -105,6 +129,7 @@ is supported.
 - Global: `~/.pi/agent/auto-perms.json`, or the active Pi agent directory.
 - Trusted project: `<cwd>/.pi/auto-perms.json`.
 - `/auto-perms`: show configuration in Pi's UI, not an API connection test.
+- `/auto-perms approve`: override the last reviewer-blocked invocation once.
 - `/auto-perms reload`: explicitly load a fresh policy snapshot.
 - `/auto-perms yolo on|off`: override the permission mode for this session.
 
@@ -127,7 +152,8 @@ that its implementation has no side effects.
 
 Deterministic allowances bypass semantic review and chat context. Keep them
 narrow. The selected reviewer receives full arguments, including proposed
-file contents, and recent user text. A conservative guard blocks obvious
+file contents, recent user text, and the assistant message preceding the latest
+reply. A conservative guard blocks obvious
 inline credentials before sending review evidence, but it is not complete
 secret detection. Do not put credentials in prompts or permission files.
 
