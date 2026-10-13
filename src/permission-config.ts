@@ -36,6 +36,7 @@ const globalSchema = z.strictObject({
   reviewTimeoutMs: z.number().int().min(1).max(120_000).optional(),
   historyLimit: z.number().int().min(1).max(20).optional(),
   maxReviewChars: z.number().int().min(1024).max(128_000).optional(),
+  maxTaskContextChars: z.number().int().min(0).max(64_000).optional(),
 });
 
 /** YOLO mode is an explicit operator bypass, never a trusted-project policy setting. */
@@ -52,6 +53,7 @@ export interface PermissionConfig {
   reviewTimeoutMs: number;
   historyLimit: number;
   maxReviewChars: number;
+  maxTaskContextChars: number;
   permission: Record<string, z.infer<typeof surfaceSchema>>;
   rules: PermissionRule[];
 }
@@ -63,6 +65,7 @@ const defaultConfig: PermissionConfig = {
   reviewTimeoutMs: 5000,
   historyLimit: 3,
   maxReviewChars: 32_000,
+  maxTaskContextChars: 8192,
   permission: {
     "*": "ask",
     read: "allow",
@@ -208,6 +211,7 @@ export async function loadPermissionConfig(
     reviewTimeoutMs: global?.reviewTimeoutMs ?? defaultConfig.reviewTimeoutMs,
     historyLimit: global?.historyLimit ?? defaultConfig.historyLimit,
     maxReviewChars: global?.maxReviewChars ?? defaultConfig.maxReviewChars,
+    maxTaskContextChars: global?.maxTaskContextChars ?? defaultConfig.maxTaskContextChars,
   };
   if (!projectTrusted) return config;
   const project = await readPolicyFile(join(cwd, ".pi", "auto-perms.json"), projectSchema);
