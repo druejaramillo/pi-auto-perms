@@ -2,7 +2,6 @@ import type { ClassifierChoiceAnswer, ClassifierContext, JsonObject } from "@ear
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { z } from "zod";
 import type { PermissionConfig } from "./permission-config.ts";
-import { containsInlinePermissionCredentials } from "./permission-evidence.ts";
 import { permissionInvocationFingerprint } from "./permission-invocation.ts";
 import { collectPermissionTaskContext } from "./permission-task-context.ts";
 
@@ -161,12 +160,6 @@ export async function reviewToolPermission(
       return {
         action: "ask",
         reason: `pi-auto-perms: Review evidence exceeds maxReviewChars; nothing was truncated or approved. ${askUser}`,
-      };
-    }
-    if (containsInlinePermissionCredentials(context.state)) {
-      return {
-        action: "ask",
-        reason: `pi-auto-perms: Review evidence contains possible inline credentials; it was not sent to the provider. Ask the user to use stored credentials or environment references and provide non-secret context before retrying.`,
       };
     }
     const model = ctx.modelRegistry.findOfType(

@@ -238,7 +238,7 @@ test("an allowed orchestrating tool cannot bypass permission review on its neste
   }
 });
 
-test("obvious inline credentials are not sent to a permission provider", async () => {
+test("credential-shaped fixtures reach write/edit review without poisoning later user context", async () => {
   const fixture = await createPermissionSession({
     classify: async (context) => permissionAnswer(context),
   });
@@ -247,13 +247,31 @@ test("obvious inline credentials are not sent to a permission provider", async (
       path: "credentials.txt",
       content: "Authorization: Bearer fixture-secret-value",
     });
-    assert.equal(result.isError, true);
-    assert.match(permissionResultText(result), /credential/i);
-    assert.equal(fixture.requests.length, 0);
-    await assert.rejects(readFile(join(fixture.cwd, "credentials.txt")), { code: "ENOENT" });
+    assert.equal(result.isError, false, permissionResultText(result));
+    assert.equal(fixture.requests.length, 1);
+    const content = await readFile(join(fixture.cwd, "credentials.txt"), "utf8");
+    assert.deepEqual(fixture.requests[0]?.state.tool, {
+      name: "write",
+      input: { path: "credentials.txt", content },
+    });
+    const prompt = `Update this synthetic test fixture: ${content}`;
+    const editedContent = `${content}\n// updated fixture`;
+    const editInput = {
+      path: "credentials.txt",
+      edits: [{ oldText: content, newText: editedContent }],
+    };
+    const edited = await fixture.run("edit", editInput, prompt);
+    assert.equal(edited.isError, false, permissionResultText(edited));
+    assert.equal(fixture.requests.length, 2);
+    assert.deepEqual(fixture.requests[1]?.state.tool, { name: "edit", input: editInput });
+    assert.equal(await readFile(join(fixture.cwd, "credentials.txt"), "utf8"), editedContent);
     const next = await fixture.run("write", { path: "normal.txt", content: "not a secret" });
-    assert.equal(next.isError, false);
+    assert.equal(next.isError, false, permissionResultText(next));
     assert.equal(await readFile(join(fixture.cwd, "normal.txt"), "utf8"), "not a secret");
+    assert.equal(fixture.requests.length, 3);
+    const userMessages = fixture.requests[2]?.state.userMessages;
+    assert.ok(Array.isArray(userMessages));
+    assert.ok(userMessages.includes(prompt));
   } finally {
     await fixture.close();
   }

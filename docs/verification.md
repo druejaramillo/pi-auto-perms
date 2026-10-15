@@ -33,8 +33,8 @@ Coverage includes:
 - One-use `/auto-perms approve` overrides of reviewer denials, agent resumption,
   identical/reordered versus changed arguments, and repeated-call consumption.
 - Manual override invalidation on reload, trust changes, and new user input;
-  deterministic denials preserved; credential-bearing arguments hashed without
-  provider submission or argument-bearing decision metadata.
+  deterministic denials preserved; credential-shaped retries retain pending
+  evidence without argument-bearing decision metadata.
 - Clear denials allowing independently permitted alternatives.
 - Trusted overrides of tool, protected-path, and directory-boundary denials;
   additive/replaced semantic rules; untrusted policy ignored; revoked trust.
@@ -51,13 +51,15 @@ Coverage includes:
   unsupported syntax still failing closed.
 - Configuration, shell-parser, and other evaluation failures reported separately
   without echoing command arguments or recommending policy reloads for parser errors.
-- Inline-credential submission blocked and oversized required evidence not truncated.
+- Credential-shaped fixtures, edits, user messages, and historical arguments/output
+  reach normal review unchanged; reviewer denials still apply. Oversized required
+  evidence is not truncated.
 - Inspected script source, completed script writes, and current assistant rationale
   reaching later script/compound-command reviews without becoming user consent.
 - Task history respecting active branches, compaction, context edits, whole-entry
   limits, remaining review space, and a global opt-out/disclosure budget.
-- Historical credentials omitted, thinking/images/custom context excluded, failed
-  calls labeled, and injected source instructions kept as untrusted tool evidence.
+- Thinking/images/custom context excluded, failed calls labeled, and injected
+  source instructions kept as untrusted tool evidence.
 - YOLO global/session/CLI controls, restoration of deterministic and classifier
   enforcement, project mode selection rejected/ignored, and stale approvals
   invalidated after mode changes.

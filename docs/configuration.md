@@ -72,8 +72,8 @@ clears the session command override and reapplies the global/CLI default.
 Mode changes clear pending-action/wait and manual override state and invalidate in-flight reviews,
 even when switched on and then back off. Already executing tools are not undone.
 
-YOLO skips tool/path/directory/shell denials, semantic review, inline-credential
-and evidence-size guards, and waiting for chat approval. No arguments are sent
+YOLO skips tool/path/directory/shell denials, semantic review, evidence-size
+limits, and waiting for chat approval. No arguments are sent
 to a permission reviewer. Decision entries identify `source: "yolo"` without
 storing arguments. `/auto-perms` and Pi's status area identify the active mode;
 startup and enable commands warn when YOLO is active. No dialogs are opened.
@@ -294,12 +294,12 @@ tools before invocation. This does not authorize bypassing an existing block.
 budget and the space remaining under `maxReviewChars` after all required action,
 policy, and authorization evidence. Set it to `0` to opt out. Entries are kept
 whole or omitted, never shortened into seemingly complete scripts. Omitted
-entries are counted; size/credential omission markers are included when they
+entries are counted; size omission markers are included when they
 fit. Missing history is not itself proof of danger or safety; a concrete,
 consequential uncertainty still requires clarification.
 
-Only one bounded pending action is retained. Credential-bearing or large
-arguments are not kept as pending evidence. If a short reply is ambiguous,
+Only one bounded pending action is retained. Large arguments are not kept
+as pending evidence. If a short reply is ambiguous,
 the agent should ask for a specific restatement of the authorization.
 
 An uncertain review pauses further reviewed calls until a new genuine user
@@ -309,15 +309,14 @@ same forbidden action. Every new reviewed action gets a fresh decision.
 Reviewer approvals are not cached across calls or sessions.
 
 The complete serialized review must fit `maxReviewChars`; required evidence is
-never truncated to obtain approval. Obvious inline credentials in required
-evidence block submission rather than being silently redacted from the action.
-Supplemental historical entries with possible credentials are omitted as above.
-The guard is conservative, not complete secret detection. Provider exceptions
-are reported generically instead of echoing potentially sensitive details.
-The selected reviewer sees full tool arguments, proposed file contents, user
-messages, the assistant's preceding message, and bounded recent assistant/tool
-text, including inspected code and command output. Choose it and the history
-budget with your code and data policies in mind.
+never truncated to obtain approval. Provider exceptions are reported generically
+instead of echoing potentially sensitive details. The selected reviewer sees
+full tool arguments, proposed file contents, user messages, the assistant's
+preceding message, and bounded recent assistant/tool text, including inspected
+code and command output. There is no credential-content scanning or redaction:
+credential-shaped test fixtures and any real inline credentials in that evidence
+are sent unchanged. Choose the reviewer and history budget with your code and
+data policies in mind.
 
 ## One-use reviewer override
 
@@ -333,7 +332,7 @@ This is an explicit operator override, not another classifier request:
   branch. The agent must be idle; the command resumes it with instructions to
   retry only that invocation. It never invokes the tool directly.
 - It deliberately skips semantic review, including semantic denials,
-  uncertainty, provider/timeout failures, and credential/evidence guards.
+  uncertainty, provider/timeout failures, and evidence-size limits.
   It cannot repair invalid configuration or bypass tool/path/directory/shell
   denials. Change policy explicitly for a deterministic denial.
 - The tool and complete arguments must match. Object-key ordering is ignored;

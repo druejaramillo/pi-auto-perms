@@ -14,7 +14,6 @@ import {
   type PermissionConfig,
   type PermissionMode,
 } from "./permission-config.ts";
-import { containsInlinePermissionCredentials } from "./permission-evidence.ts";
 import { permissionInvocationFingerprint } from "./permission-invocation.ts";
 import { type PendingPermissionAction, reviewToolPermission } from "./permission-review.ts";
 
@@ -372,8 +371,7 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
       waitingAtRevision = review.action === "ask" ? revision : undefined;
       const pendingInput: JsonObject = JSON.parse(inputSnapshot);
       pending =
-        inputSnapshot.length <= Math.min(8192, policy.maxReviewChars / 4) &&
-        !containsInlinePermissionCredentials(pendingInput)
+        inputSnapshot.length <= Math.min(8192, policy.maxReviewChars / 4)
           ? { tool: event.toolName, input: pendingInput }
           : undefined;
       return blockToolPermission(ctx, review.reason);

@@ -1,6 +1,5 @@
 import type { JsonObject } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { containsInlinePermissionCredentials } from "./permission-evidence.ts";
 
 const recentActivityLimit = 12;
 
@@ -67,13 +66,12 @@ export function collectPermissionTaskContext(
   if (JSON.stringify(context()).length > maxChars) return;
   // Prefer the newest whole observations; never clip a script and present it as complete.
   for (const activity of activities.slice(-recentActivityLimit).reverse()) {
-    const hasCredentials = containsInlinePermissionCredentials(activity);
     const fits = (candidate: JsonObject, omitted: number) =>
       JSON.stringify({
         recentActivity: [candidate, ...recentActivity],
         omittedActivityCount: omitted,
       }).length <= maxChars;
-    if (!hasCredentials && fits(activity, omittedActivityCount - 1)) {
+    if (fits(activity, omittedActivityCount - 1)) {
       recentActivity.unshift(activity);
       omittedActivityCount -= 1;
     } else {
@@ -82,7 +80,7 @@ export function collectPermissionTaskContext(
         entryId: activity.entryId,
         sourceKind: activity.kind,
         ...(activity.kind === "tool" ? { toolName: activity.toolName } : {}),
-        reason: hasCredentials ? "possible inline credentials" : "context size limit",
+        reason: "context size limit",
       };
       if (fits(omitted, omittedActivityCount)) recentActivity.unshift(omitted);
     }

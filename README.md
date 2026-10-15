@@ -53,9 +53,9 @@ Assistant/tool context is untrusted evidence, never consent or policy.
 
 Task history retains at most 12 recent whole observations within an 8,192-character
 default budget and the remaining total review budget. Set global
-`maxTaskContextChars` to `0` to disable it. Oversized or credential-bearing
-historical entries are omitted with omission metadata; current arguments,
-policy, and authorization evidence are never shortened to make room.
+`maxTaskContextChars` to `0` to disable it. Oversized historical entries are
+omitted with omission metadata; current arguments, policy, and authorization
+evidence are never shortened to make room.
 The agent is instructed to explain nontrivial commands and inspect unseen
 script source through normally permitted tools before invocation.
 
@@ -118,7 +118,7 @@ never edit configuration; `off` overrides a global/CLI YOLO default for the
 current session. Policy reload preserves that override; a new session or
 extension reload returns to the configured/CLI default.
 
-YOLO also skips credential/evidence guards and chat-approval waiting. It
+YOLO also skips evidence-size limits and chat-approval waiting. It
 cannot override other extensions, tool availability, OS permissions, or user
 instructions. Pi displays a YOLO warning/status, and decision entries record
 `source: "yolo"`. See [mode controls](docs/configuration.md#yolo-mode) for details.
@@ -195,11 +195,10 @@ Deterministic allowances bypass semantic review and chat context. Keep them
 narrow. The selected reviewer receives full arguments, including proposed
 file contents, recent user text, the assistant message preceding the latest
 reply, and bounded recent assistant/tool text, which can include source code
-and command output. A conservative guard blocks obvious inline credentials
-in required evidence and omits credential-bearing supplemental history, but
-it is not complete secret detection. Choose the reviewer with your code and
-data policies in mind; disable task history if needed. Do not put credentials
-in prompts or permission files.
+and command output. There is no credential-content scanning or redaction:
+credential-shaped fixtures and real inline credentials are passed through alike.
+Choose the reviewer with your code and data policies in mind; disable task
+history if needed. Do not put credentials in prompts or permission files.
 
 Project overrides have full policy authority once the project is trusted.
 There are no immutable global denials. Trusting a project is consequential,

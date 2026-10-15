@@ -233,16 +233,33 @@ test("manual approval cannot override a deterministic path denial or approve an 
   }
 });
 
-test("manual override hashes credential-bearing arguments without sending or logging them", async () => {
-  const fixture = await createPermissionSession();
+test("manual override retains credential-shaped retry evidence without logging arguments", async () => {
+  const fixture = await createPermissionSession({
+    classify: async (context) =>
+      permissionAnswer(context, 0.01, 0.98, 0.01, "deny", "rule.private-data"),
+  });
   try {
     const content = "Authorization: Bearer fixture-not-a-real-secret";
     const denied = await fixture.run("write", { path: "stored-locally.txt", content });
     assert.equal(denied.isError, true);
-    assert.match(permissionResultText(denied), /possible inline credentials/);
+    assert.match(permissionResultText(denied), /Reviewer denied this action/);
+    assert.equal(fixture.requests.length, 1);
+    await assert.rejects(readFile(join(fixture.cwd, "stored-locally.txt")), { code: "ENOENT" });
+    const retried = await fixture.run(
+      "write",
+      { path: "stored-locally.txt", content },
+      "Yes, write that exact synthetic test fixture.",
+    );
+    assert.equal(retried.isError, true);
+    assert.match(permissionResultText(retried), /Reviewer denied this action/);
+    assert.deepEqual(fixture.requests[1]?.state.previousBlockedAction, {
+      tool: "write",
+      input: { path: "stored-locally.txt", content },
+    });
+    await assert.rejects(readFile(join(fixture.cwd, "stored-locally.txt")), { code: "ENOENT" });
     await approvePermissionAndWait(fixture);
     assert.equal(await readFile(join(fixture.cwd, "stored-locally.txt"), "utf8"), content);
-    assert.equal(fixture.requests.length, 0);
+    assert.equal(fixture.requests.length, 2);
     const decisions = fixture.session.sessionManager
       .getBranch()
       .flatMap((entry) =>

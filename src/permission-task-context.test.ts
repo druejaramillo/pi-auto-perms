@@ -248,7 +248,7 @@ test("oversized historical source is marked omitted, never clipped into seemingl
   assert.equal(permissionTaskActivities(context)[1]?.text, "Recent explanation");
 });
 
-test("possible credentials in historical arguments or output are omitted before provider submission", async () => {
+test("credential-shaped historical arguments and output reach review unchanged", async () => {
   const fixture = await createPermissionSession({
     attemptsPerTurn: 2,
     followingCalls: [{ name: "write", arguments: { path: "safe.txt", content: "safe" } }],
@@ -259,16 +259,23 @@ test("possible credentials in historical arguments or output are omitted before 
     const result = await fixture.run("read", { path: "notes.txt" });
     assert.equal(result.isError, false);
     const context = fixture.requests[0]?.state.taskContext;
-    assert.doesNotMatch(JSON.stringify(fixture.requests), /fixture-private-value/);
-    assert.equal(permissionTaskActivities(context)[0]?.reason, "possible inline credentials");
+    assert.equal(fixture.requests.length, 1);
+    assert.equal(permissionTaskActivities(context)[0]?.kind, "tool");
+    assert.equal(permissionTaskActivities(context)[0]?.toolName, "read");
+    assert.equal(
+      permissionTaskActivities(context)[0]?.output,
+      await readFile(join(fixture.cwd, "notes.txt"), "utf8"),
+    );
+    assert.equal(await readFile(join(fixture.cwd, "safe.txt"), "utf8"), "safe");
   } finally {
     await fixture.close();
   }
   const manager = SessionManager.inMemory();
   appendPermissionObservation(manager, "custom", { token: "fixture-inline-value" }, "ok");
   const context = collectPermissionTaskContext(manager, 8192);
-  assert.doesNotMatch(JSON.stringify(context), /fixture-inline-value/);
-  assert.equal(permissionTaskActivities(context)[0]?.reason, "possible inline credentials");
+  assert.equal(context?.omittedActivityCount, 0);
+  assert.deepEqual(permissionTaskActivities(context)[0]?.input, { token: "fixture-inline-value" });
+  assert.equal(permissionTaskActivities(context)[0]?.output, "ok");
 });
 
 test("injected instructions in inspected source remain tool evidence, not user approval", async () => {
