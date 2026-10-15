@@ -21,6 +21,10 @@ Coverage includes:
 - Immediate deterministic allow/deny and reviewer bypass.
 - Probability boundaries, choice versus confidence, malformed distributions,
   contradictory answers, exceptions, provider errors, and late responses.
+- Rounding totals of `0.99`/`1.01` and one-percentage-point winner mismatches
+  in permission and reason answers, including actual write/edit effects. Raw
+  thresholds and selected labels are preserved without renormalization; missing
+  labels, invalid numbers, larger inconsistencies, and conflicting reasons still block.
 - Explicit provider/model selection for Jev, Clef, Clef Flash, and Decisions.
 - Uncertain actions waiting for a genuine user reply, extension-generated
   messages excluded, bounded history, and the latest refusal reaching review.

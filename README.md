@@ -33,6 +33,10 @@ runtime dependency on `@gotgenes/pi-permission-system`.
    message arrives. Give the agent instructions to ask and wait, not a
    permission dialog. Deterministic inspection remains available.
 
+Small two-decimal rounding discrepancies are tolerated without renormalizing
+probabilities, changing the selected choice, or lowering the approval threshold.
+See [response validation](docs/configuration.md#global-settings) for the exact bounds.
+
 Reviews include exact tool arguments, the declared tool description,
 working directory, effective rules, recent genuine user messages, the assistant
 message preceding the latest reply, a bounded previously blocked action, and

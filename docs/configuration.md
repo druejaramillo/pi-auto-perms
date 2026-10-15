@@ -39,8 +39,14 @@ All fields are optional; `version`, when present, must be `1`.
 
 The threshold uses the probability of the selected **allow choice**, not a
 separate confidence field. The default is a starting point, not a calibrated
-claim about real-world correctness. Reviews require a valid normalized
-distribution and a non-conflicting reason category.
+claim about real-world correctness. Both permission and reason answers must
+include every expected label and finite probabilities and confidence in `[0, 1]`.
+To tolerate two-decimal provider rounding, probability totals may differ from `1`
+by at most `0.01`, and the selected choice may be at most `0.01` below the highest
+probability, plus floating-point epsilon. Larger inconsistencies still block.
+The reported choice and probabilities are used unchanged: no renormalization,
+score inflation, or replacement with the apparent winner. The allow threshold
+and non-conflicting reason requirement still apply.
 
 There is no `failOpen`, dialog fallback, or alternate-provider fallback.
 Provider errors and timeouts block the action. A user saying “yes” does not

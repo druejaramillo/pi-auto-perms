@@ -39,8 +39,11 @@ function parseAnswer(value: unknown, choices: string[]): ClassifierChoiceAnswer 
   const probabilities = choices.map((choice) => answer.probabilities[choice]);
   if (probabilities.some((probability) => probability === undefined)) return;
   const numbers = probabilities.filter((probability) => probability !== undefined);
-  if (Math.abs(numbers.reduce((sum, value) => sum + value, 0) - 1) > 0.00001) return;
-  if ((answer.probabilities[answer.choice] ?? -1) < Math.max(...numbers)) return;
+  // Tolerate one percentage point of provider rounding without changing labels or scores.
+  const roundingTolerance = 0.01 + Number.EPSILON * choices.length;
+  if (Math.abs(numbers.reduce((sum, value) => sum + value, 0) - 1) > roundingTolerance) return;
+  if (Math.max(...numbers) - (answer.probabilities[answer.choice] ?? -1) > roundingTolerance)
+    return;
   return answer;
 }
 
