@@ -163,8 +163,14 @@ global/project policy.
   ambiguity keep broad allow globs from granting an entire complex script;
   those actions go to review. Simple Bash prefix/suffix trim patterns such as
   `${spec%%|*}` and `${spec#*|}` are kept together during tokenization; review
-  and execution still receive the unchanged command. Unsupported shell syntax
-  fails closed with a parser-specific error, not configuration-reload advice.
+  and execution still receive the unchanged command. Node-style inline JavaScript
+  (`node`, `nodejs`, `bun`, or `tsx` with `-e`/`--eval` or `-p`/`--print`) is
+  always reviewed, not interpreted as a filename: expressions such as
+  `process.env.HERDR_BIN_PATH` do not match environment-file path rules. Script
+  filenames, other arguments, and redirection targets retain path checks;
+  paths accessed inside source code are assessed by the reviewer. Unsupported
+  shell syntax fails closed with a parser-specific error, not configuration-reload
+  advice.
 - Other tools default to review unless explicitly allowed. Top-level `path`
   or `paths` arguments also receive path and boundary checks; unknown tools
   with paths are checked in both directions.

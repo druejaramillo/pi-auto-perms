@@ -38,6 +38,39 @@ function parsePermissionShellCommand(command: string): ReturnType<typeof parse> 
   }
 }
 
+function inlineJavaScriptSourceIndex(words: string[]): number | undefined {
+  const executableIndex = words.findIndex((word) => !/^[a-zA-Z_]\w*=/.test(word));
+  const executable = words[executableIndex]?.split("/").at(-1) ?? "";
+  if (!["node", "nodejs", "bun", "tsx"].includes(executable)) return undefined;
+  for (let index = executableIndex + 1; index < words.length; index++) {
+    const word = words[index] ?? "";
+    if (["-e", "--eval", "-p", "--print", "-pe"].includes(word))
+      return index + 1 < words.length ? index + 1 : undefined;
+    if (/^--(?:eval|print)=/.test(word)) return index;
+    if (/^--[\w-]+=/.test(word)) continue;
+    if (
+      [
+        "-r",
+        "--require",
+        "--import",
+        "--loader",
+        "--experimental-loader",
+        "--input-type",
+        "-C",
+        "--conditions",
+        "--title",
+      ].includes(word)
+    ) {
+      index++;
+      continue;
+    }
+    if (["--no-warnings", "--enable-source-maps"].includes(word)) continue;
+    // Stop at a script, --, or an unknown option whose argument arity is ambiguous.
+    return undefined;
+  }
+  return undefined;
+}
+
 function expandHome(path: string): string {
   return path.replace(/^~(?=\/|$)|^\$HOME(?=\/|$)|^\$\{HOME\}(?=\/|$)/, homedir());
 }
@@ -208,22 +241,31 @@ export async function decideDeterministicPermission(
     decisions.length = 0;
     decisions.push(surfaceDecision(config, "bash", [command], fallback));
     let words: string[] = [];
+    const commandUnits: string[][] = [];
     const tokens = parsePermissionShellCommand(command);
     for (const token of tokens) {
-      if (typeof token === "string") {
-        words.push(token);
+      if (typeof token === "string") words.push(token);
+      else {
+        commandUnits.push(words);
+        words = [];
+      }
+    }
+    commandUnits.push(words);
+    for (const unitWords of commandUnits) {
+      const sourceIndex = inlineJavaScriptSourceIndex(unitWords);
+      if (sourceIndex !== undefined)
+        decisions.push({ action: "ask", rule: "bash: inline JavaScript requires review" });
+      for (const [index, token] of unitWords.entries()) {
+        // Inline source is code, not a filename; the reviewer receives the unchanged command.
+        if (index === sourceIndex) continue;
         const candidate = token.includes("=") ? token.slice(token.indexOf("=") + 1) : token;
         if (candidate && !candidate.startsWith("-") && !candidate.includes("\0")) {
           decisions.push(...(await pathDecisions(config, candidate, cwd, "unknown")));
         }
-      } else {
-        const unit = surfaceDecision(config, "bash", [words.join(" ")], fallback);
-        if (unit.action === "deny") decisions.push(unit);
-        words = [];
       }
+      const unit = surfaceDecision(config, "bash", [unitWords.join(" ")], fallback);
+      if (unit.action === "deny") decisions.push(unit);
     }
-    const tail = surfaceDecision(config, "bash", [words.join(" ")], fallback);
-    if (tail.action === "deny") decisions.push(tail);
     // Shell syntax, indirection, and expansions cannot be proven safe by a prefix glob.
     if (
       !/^[a-zA-Z0-9_./:@%+=, -]+$/.test(command) ||

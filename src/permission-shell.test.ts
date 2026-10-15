@@ -33,6 +33,122 @@ for (const [expansion, expected] of [
   });
 }
 
+for (const command of [
+  "node -e 'process.env.HERDR_BIN_PATH'",
+  "node --eval 'process.env.HERDR_BIN_PATH'",
+  "node -p 'void process.env.HERDR_BIN_PATH'",
+  "node --print 'void process.env.HERDR_BIN_PATH'",
+  "node -pe 'void process.env.HERDR_BIN_PATH'",
+  "node --eval='process.env.HERDR_BIN_PATH'",
+  "node --print='void process.env.HERDR_BIN_PATH'",
+  "node -e process.env.HERDR_BIN_PATH",
+  "node --eval process.env.HERDR_BIN_PATH",
+  "node --enable-source-maps -e 'process.env.HERDR_BIN_PATH'",
+  "node --input-type=module -e 'process.env.HERDR_BIN_PATH'",
+  "node --input-type module --no-warnings -e 'process.env.HERDR_BIN_PATH'",
+  "FIXTURE_MODE=test node -e 'process.env.HERDR_BIN_PATH'",
+  `${process.execPath} -e 'process.env.HERDR_BIN_PATH'`,
+  "node -e 'const value = process.env.HERDR_BIN_PATH; void value'",
+]) {
+  test(`inline JavaScript reaches review unchanged: ${command}`, async () => {
+    const fixture = await createPermissionSession({
+      classify: async (context) => permissionAnswer(context),
+    });
+    try {
+      const result = await fixture.run("bash", { command });
+      assert.equal(result.isError, false, permissionResultText(result));
+      assert.equal(fixture.requests.length, 1);
+      assert.deepEqual(fixture.requests[0]?.state.tool, { name: "bash", input: { command } });
+    } finally {
+      await fixture.close();
+    }
+  });
+}
+
+for (const invocation of [
+  "node -e",
+  "nodejs -e",
+  "bun -e",
+  "tsx -e",
+  "node --eval=",
+  "node --print=",
+  "node -pe",
+]) {
+  test(`${invocation} inline source still requires review under a blanket Bash allowance`, async () => {
+    const fixture = await createPermissionSession({
+      global: { permission: { bash: "allow" } },
+      classify: async (context) => permissionAnswer(context, 0.01, 0.01, 0.98, "ask", "unclear"),
+    });
+    try {
+      const command = `${invocation}${invocation.endsWith("=") ? "" : " "}process.env.HERDR_BIN_PATH`;
+      const result = await fixture.run("bash", { command });
+      assert.equal(result.isError, true);
+      assert.match(permissionResultText(result), /Review uncertain/);
+      assert.equal(fixture.requests.length, 1);
+      assert.deepEqual(fixture.requests[0]?.state.tool, { name: "bash", input: { command } });
+    } finally {
+      await fixture.close();
+    }
+  });
+}
+
+for (const command of [
+  "node process.env.HERDR_BIN_PATH",
+  "node script.js -e private.env",
+  "node -- -e private.env",
+  "node --title -e private.env",
+  "node --unknown-option -e private.env",
+  "node --require private.env -e 'process.env.HERDR_BIN_PATH'",
+  "node -e 'process.env.HERDR_BIN_PATH' private.env",
+  "node -e 'process.env.HERDR_BIN_PATH' > private.env",
+  "node -e 'process.env.HERDR_BIN_PATH' && cat private.env",
+]) {
+  test(`inline JavaScript handling preserves protected-path denial: ${command}`, async () => {
+    const fixture = await createPermissionSession({
+      classify: async (context) => permissionAnswer(context),
+    });
+    try {
+      const result = await fixture.run("bash", { command });
+      assert.equal(result.isError, true);
+      assert.match(permissionResultText(result), /Denied by deterministic rule.*path_/);
+      assert.equal(fixture.requests.length, 0);
+    } finally {
+      await fixture.close();
+    }
+  });
+}
+
+test("inline JavaScript does not weaken native file-path protection", async () => {
+  const fixture = await createPermissionSession();
+  try {
+    const result = await fixture.run("read", { path: "process.env.HERDR_BIN_PATH" });
+    assert.equal(result.isError, true);
+    assert.match(permissionResultText(result), /Denied by deterministic rule.*path_/);
+    assert.equal(fixture.requests.length, 0);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test("a denied command after inline JavaScript stays denied", async () => {
+  const fixture = await createPermissionSession({
+    global: { permission: { bash: { "*": "ask", "rm *": "deny" } } },
+    classify: async (context) => permissionAnswer(context),
+  });
+  try {
+    await writeFile(join(fixture.cwd, "victim.txt"), "survives");
+    const result = await fixture.run("bash", {
+      command: "node -e 'process.env.HERDR_BIN_PATH' && rm victim.txt",
+    });
+    assert.equal(result.isError, true);
+    assert.match(permissionResultText(result), /Denied by deterministic rule.*rm/);
+    assert.equal(await readFile(join(fixture.cwd, "victim.txt"), "utf8"), "survives");
+    assert.equal(fixture.requests.length, 0);
+  } finally {
+    await fixture.close();
+  }
+});
+
 test("a compound PDF loop reaches review intact without executing PDF tools", async () => {
   const fixture = await createPermissionSession({
     classify: async (context) => permissionAnswer(context, 0.01, 0.01, 0.98, "ask", "unclear"),
