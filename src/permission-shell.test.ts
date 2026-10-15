@@ -65,6 +65,21 @@ for (const command of [
   });
 }
 
+test("heredoc JavaScript reaches review unchanged instead of matching environment-file rules", async () => {
+  const fixture = await createPermissionSession({
+    classify: async (context) => permissionAnswer(context),
+  });
+  try {
+    const command = "node --input-type=module <<'NODE'\nprocess.env.HERDR_BIN_PATH;\nNODE";
+    const result = await fixture.run("bash", { command });
+    assert.equal(result.isError, false, permissionResultText(result));
+    assert.equal(fixture.requests.length, 1);
+    assert.deepEqual(fixture.requests[0]?.state.tool, { name: "bash", input: { command } });
+  } finally {
+    await fixture.close();
+  }
+});
+
 for (const invocation of [
   "node -e",
   "nodejs -e",

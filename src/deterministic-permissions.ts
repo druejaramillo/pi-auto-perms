@@ -4,6 +4,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "shell-quote";
 import type { PermissionAction, PermissionConfig } from "./permission-config.ts";
+import { stripPermissionShellHeredocs } from "./permission-shell-heredocs.ts";
 
 /** A deterministic decision, retaining the rule that decided it. */
 export interface DeterministicDecision {
@@ -24,13 +25,13 @@ export class PermissionShellParseError extends Error {
 }
 
 function parsePermissionShellCommand(command: string): ReturnType<typeof parse> {
-  // shell-quote otherwise splits operators inside unquoted Bash prefix/suffix trim patterns.
-  // Skip quoted/escaped text; only shield literal patterns, never executable substitutions.
-  const escapedCommand = command.replace(
-    /\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*"|\$\{(?:[a-zA-Z_]\w*|\d+|[@*#?$!-])(?:%%?|##?)[^'"`\\${}()<>\r\n]*\}/g,
-    (token) => (token.startsWith("${") ? token.replace(/[|&; \t]/g, "\\$&") : token),
-  );
   try {
+    // shell-quote otherwise splits operators inside unquoted Bash prefix/suffix trim patterns.
+    // Skip quoted/escaped text; only shield literal patterns, never executable substitutions.
+    const escapedCommand = stripPermissionShellHeredocs(command).replace(
+      /\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*"|\$\{(?:[a-zA-Z_]\w*|\d+|[@*#?$!-])(?:%%?|##?)[^'"`\\${}()<>\r\n]*\}/g,
+      (token) => (token.startsWith("${") ? token.replace(/[|&; \t]/g, "\\$&") : token),
+    );
     // Only deterministic tokenization uses this spelling; review/execution keep the original input.
     return parse(escapedCommand);
   } catch {
@@ -242,7 +243,8 @@ export async function decideDeterministicPermission(
     decisions.push(surfaceDecision(config, "bash", [command], fallback));
     let words: string[] = [];
     const commandUnits: string[][] = [];
-    const tokens = parsePermissionShellCommand(command);
+    // Trailing whitespace can distinguish a heredoc delimiter from ordinary body content.
+    const tokens = parsePermissionShellCommand(input.command);
     for (const token of tokens) {
       if (typeof token === "string") words.push(token);
       else {

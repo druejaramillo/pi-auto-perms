@@ -168,9 +168,16 @@ global/project policy.
   always reviewed, not interpreted as a filename: expressions such as
   `process.env.HERDR_BIN_PATH` do not match environment-file path rules. Script
   filenames, other arguments, and redirection targets retain path checks;
-  paths accessed inside source code are assessed by the reviewer. Unsupported
-  shell syntax fails closed with a parser-specific error, not configuration-reload
-  advice.
+  paths accessed inside source code are assessed by the reviewer. Literal
+  outer-level heredoc bodies (including quoted/escaped delimiters, `<<-`, and
+  multiple heredocs) are also reviewed as stdin source/data, not filenames,
+  regardless of the receiving command. Header arguments, redirections, and
+  commands after each closing delimiter retain deterministic checks. Heredoc
+  parsing preserves significant trailing whitespace and shell newline boundaries.
+  Unquoted bodies requiring shell expansion or line continuation, unsupported
+  delimiters, and unterminated heredocs fail closed rather than hiding executable
+  syntax. Shell parsing failures produce a parser-specific error, not
+  configuration-reload advice.
 - Other tools default to review unless explicitly allowed. Top-level `path`
   or `paths` arguments also receive path and boundary checks; unknown tools
   with paths are checked in both directions.

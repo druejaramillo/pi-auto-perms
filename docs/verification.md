@@ -49,6 +49,12 @@ Coverage includes:
   compound PDF loops reviewed without execution; quoted literals, protected paths,
   and denied following commands preserved; command/process substitutions and other
   unsupported syntax still failing closed.
+- Inline JavaScript eval/print arguments and literal heredoc bodies reaching review
+  unchanged, including the reported Herdr script shape without live Herdr access.
+  Quoted, escaped, tab-stripped, empty, and multiple delimiters; significant trailing
+  whitespace; source resembling shell syntax; and newline/comment boundaries are
+  covered. Real header/redirect paths and denied surrounding commands remain
+  protected; expanding, unsupported, or unterminated heredocs fail closed.
 - Configuration, shell-parser, and other evaluation failures reported separately
   without echoing command arguments or recommending policy reloads for parser errors.
 - Credential-shaped fixtures, edits, user messages, and historical arguments/output
