@@ -41,6 +41,12 @@ Coverage includes:
   apply, and nested writes through an allowed orchestrator.
 - Overlong ASCII, multibyte, and multiline shell arguments reaching review intact;
   lexical and canonical symlink-parent denials preserved, with symlink loops failing closed.
+- Bash prefix/suffix trim patterns containing pipes reaching review unchanged;
+  compound PDF loops reviewed without execution; quoted literals, protected paths,
+  and denied following commands preserved; command/process substitutions and other
+  unsupported syntax still failing closed.
+- Configuration, shell-parser, and other evaluation failures reported separately
+  without echoing command arguments or recommending policy reloads for parser errors.
 - Inline-credential submission blocked and oversized required evidence not truncated.
 - Inspected script source, completed script writes, and current assistant rationale
   reaching later script/compound-command reviews without becoming user consent.

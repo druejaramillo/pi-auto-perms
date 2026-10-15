@@ -156,7 +156,8 @@ test("a symlink-loop error still fails closed before shell review", async () => 
     await symlink("loop", join(fixture.cwd, "loop"));
     const result = await fixture.run("bash", { command: "printf '%s' loop/message.txt" });
     assert.equal(result.isError, true);
-    assert.match(permissionResultText(result), /Configuration or deterministic evaluation failed/);
+    assert.match(permissionResultText(result), /Permission evaluation failed/);
+    assert.doesNotMatch(permissionResultText(result), /Configuration|reload/);
     assert.equal(fixture.requests.length, 0);
   } finally {
     await fixture.close();

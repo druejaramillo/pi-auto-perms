@@ -155,7 +155,10 @@ global/project policy.
 - `bash` maps match literal and parsed commands. A denied command anywhere
   in a shell chain stays denied. Operators, expansion, redirection, or
   ambiguity keep broad allow globs from granting an entire complex script;
-  those actions go to review.
+  those actions go to review. Simple Bash prefix/suffix trim patterns such as
+  `${spec%%|*}` and `${spec#*|}` are kept together during tokenization; review
+  and execution still receive the unchanged command. Unsupported shell syntax
+  fails closed with a parser-specific error, not configuration-reload advice.
 - Other tools default to review unless explicitly allowed. Top-level `path`
   or `paths` arguments also receive path and boundary checks; unknown tools
   with paths are checked in both directions.

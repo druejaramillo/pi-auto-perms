@@ -15,6 +15,29 @@ const rank: Record<PermissionAction, number> = { allow: 0, ask: 1, deny: 2 };
 const readers = new Set(["read", "grep", "find", "ls", "code_check", "code_lsp"]);
 const nativePathTools = new Set(["read", "write", "edit", "grep", "find", "ls"]);
 
+/** A shell parsing failure that never includes potentially sensitive command text. */
+export class PermissionShellParseError extends Error {
+  constructor() {
+    super("pi-auto-perms: Shell command parsing failed during deterministic evaluation.");
+    this.name = "PermissionShellParseError";
+  }
+}
+
+function parsePermissionShellCommand(command: string): ReturnType<typeof parse> {
+  // shell-quote otherwise splits operators inside unquoted Bash prefix/suffix trim patterns.
+  // Skip quoted/escaped text; only shield literal patterns, never executable substitutions.
+  const escapedCommand = command.replace(
+    /\\[\s\S]|'[^']*'|"(?:\\[\s\S]|[^"\\])*"|\$\{(?:[a-zA-Z_]\w*|\d+|[@*#?$!-])(?:%%?|##?)[^'"`\\${}()<>\r\n]*\}/g,
+    (token) => (token.startsWith("${") ? token.replace(/[|&; \t]/g, "\\$&") : token),
+  );
+  try {
+    // Only deterministic tokenization uses this spelling; review/execution keep the original input.
+    return parse(escapedCommand);
+  } catch {
+    throw new PermissionShellParseError();
+  }
+}
+
 function expandHome(path: string): string {
   return path.replace(/^~(?=\/|$)|^\$HOME(?=\/|$)|^\$\{HOME\}(?=\/|$)/, homedir());
 }
@@ -185,7 +208,7 @@ export async function decideDeterministicPermission(
     decisions.length = 0;
     decisions.push(surfaceDecision(config, "bash", [command], fallback));
     let words: string[] = [];
-    const tokens = parse(command);
+    const tokens = parsePermissionShellCommand(command);
     for (const token of tokens) {
       if (typeof token === "string") {
         words.push(token);

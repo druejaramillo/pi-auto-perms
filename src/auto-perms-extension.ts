@@ -5,7 +5,10 @@ import {
   getAgentDir,
   type ToolCallEvent,
 } from "@earendil-works/pi-coding-agent";
-import { decideDeterministicPermission } from "./deterministic-permissions.ts";
+import {
+  decideDeterministicPermission,
+  PermissionShellParseError,
+} from "./deterministic-permissions.ts";
 import {
   loadPermissionConfig,
   type PermissionConfig,
@@ -260,7 +263,15 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
       const snapshot = currentConfigSnapshot(ctx);
       const revision = userRevision;
       const inputSnapshot = JSON.stringify(event.input);
-      const policy = await snapshot.promise;
+      const policy = await snapshot.promise.catch(() => undefined);
+      if (!policy) {
+        manualApproval = undefined;
+        pending = undefined;
+        return blockToolPermission(
+          ctx,
+          "pi-auto-perms: Configuration loading failed; no tool was executed. Ask the user to fix auto-perms.json and run /auto-perms reload. Do not bypass the block.",
+        );
+      }
       const stale = () =>
         configSnapshot !== snapshot ||
         userRevision !== revision ||
@@ -366,12 +377,14 @@ export default function autoPermsExtension(pi: ExtensionAPI): void {
           ? { tool: event.toolName, input: pendingInput }
           : undefined;
       return blockToolPermission(ctx, review.reason);
-    } catch {
+    } catch (error) {
       manualApproval = undefined;
       pending = undefined;
       return blockToolPermission(
         ctx,
-        "pi-auto-perms: Configuration or deterministic evaluation failed; no tool was executed. Ask the user to fix the policy and run /auto-perms reload. Do not bypass the block.",
+        error instanceof PermissionShellParseError
+          ? "pi-auto-perms: Shell command parsing failed during deterministic evaluation; no tool was executed. Ask the user to report this parser limitation. Do not bypass the block."
+          : "pi-auto-perms: Permission evaluation failed; no tool was executed. Ask the user to report this evaluation error. Do not bypass the block.",
       );
     }
   });
